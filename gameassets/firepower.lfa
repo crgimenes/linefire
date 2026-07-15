@@ -1,0 +1,13 @@
+(asset "firepower"
+  (version 2)
+  (kind "fire")
+  (tags "powerup" "fire")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#ff8040") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 2) (line 16 10) (line 12 8) (line 8 10) (close))
+    (path (move 12 12) (line 16 20) (line 12 18) (line 8 20) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

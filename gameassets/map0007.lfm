@@ -1,0 +1,27 @@
+(level "map0007"
+  (version 2)
+  (title "Battlezone")
+  (tags "stage" "boss")
+  (size 1900 1900)
+  (music "music/Midnight_Override.mp3")
+  (player-start 950 1700 -90)
+  (entry "enter" 950 1700 -90)
+  ; A tank duel in the open, with three blocks of cover. The boss tank is shielded until its
+  ; guard (turrets + rushers) is destroyed; the way onward opens only when the arena is clear.
+  (wall "walls"
+    (stroke "#ff8060") (width 3) (fill "transparent") (glow 1.0)
+    (rect 60 60 1780 1780)
+    (rect 400 720 200 200)
+    (rect 1300 720 200 200)
+    (rect 850 1180 200 200))
+  (spawn "boss" "tank" 950 520 -90 (kind "tank") (boss))
+  (spawn "turret_l" "turret" 500 480 -90 (kind "turret"))
+  (spawn "turret_r" "turret" 1400 480 -90 (kind "turret"))
+  (spawn "rusher_l" "rusher" 480 1300 0 (kind "rusher"))
+  (spawn "rusher_r" "rusher" 1420 1300 180 (kind "rusher"))
+  (spawn "heal_1" "powerup" 950 1550 0 (kind "heal"))
+  (spawn "shield_1" "shield" 300 950 0 (kind "shield"))
+  (zone "checkpoint_1" "circle" 950 1650 70 (trigger "checkpoint"))
+  (resolution "cleared" "portal" (target "map0002") (at 950 260))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

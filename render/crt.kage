@@ -1,0 +1,61 @@
+//go:build ignore
+
+//kage:unit pixels
+
+// Full-screen CRT post-process: barrel distortion, chromatic aberration,
+// scanlines, an RGB phosphor mask and a vignette. Sampled from the rendered
+// scene (image 0).
+package main
+
+var Curvature float     // edge bulge; 0 is flat
+var ScanIntensity float // 0..1 scanline darkening
+var Aberration float    // horizontal channel split, in pixels
+var Vignette float      // 0..1 corner darkening
+
+// warp bulges the [0,1] uv outward from the center to fake screen curvature.
+func warp(uv vec2) vec2 {
+	c := uv*2.0 - 1.0
+	d := c.x*c.x + c.y*c.y
+	return (c*(1.0+Curvature*d) + 1.0) * 0.5
+}
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	uv := (srcPos - origin) / size
+
+	wuv := warp(uv)
+	if wuv.x < 0.0 || wuv.x > 1.0 || wuv.y < 0.0 || wuv.y > 1.0 {
+		return vec4(0.0, 0.0, 0.0, 1.0)
+	}
+
+	// Chromatic aberration: split the red and blue channels horizontally.
+	aberr := Aberration / size.x
+	r := imageSrc0At(origin + vec2(clamp(wuv.x+aberr, 0.0, 1.0), wuv.y)*size).r
+	g := imageSrc0At(origin + wuv*size).g
+	b := imageSrc0At(origin + vec2(clamp(wuv.x-aberr, 0.0, 1.0), wuv.y)*size).b
+	col := vec3(r, g, b)
+
+	// Scanlines: roughly one dark line every 2 source pixels.
+	scan := 0.5 + 0.5*cos(wuv.y*size.y*3.14159)
+	col *= 1.0 - ScanIntensity*scan
+
+	// Subtle RGB phosphor mask by column.
+	phase := mod(wuv.x*size.x, 3.0)
+	mask := vec3(0.85, 0.85, 1.0)
+	if phase < 1.0 {
+		mask = vec3(1.0, 0.85, 0.85)
+	} else if phase < 2.0 {
+		mask = vec3(0.85, 1.0, 0.85)
+	}
+	col *= mask
+
+	// Vignette.
+	dv := distance(wuv, vec2(0.5, 0.5))
+	col *= clamp(1.0-Vignette*dv*dv*2.0, 0.0, 1.0)
+
+	// Gentle brightness compensation for the mask/scanline dimming.
+	col *= 1.1
+
+	return vec4(col, 1.0)
+}

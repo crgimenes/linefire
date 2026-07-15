@@ -1,0 +1,13 @@
+(asset "wpn_devourer"
+  (version 2)
+  (kind "weapon-devourer")
+  (tags "weapon" "devourer")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#c040ff") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 1) (line 23 12) (line 12 23) (line 1 12) (close))
+    (path (move 12 7) (line 17 12) (line 12 17) (line 7 12) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

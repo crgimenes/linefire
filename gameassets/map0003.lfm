@@ -1,0 +1,31 @@
+(level "map0003"
+  (version 2)
+  (title "Sinistar's Lair")
+  (tags "stage" "finale")
+  (size 900 900)
+  (music "music/Midnight_Override.mp3")
+  (player-start 450 760 -90)
+  (entry "from_map2" 450 760 -90)
+  (wall "arena"
+    (stroke "#ff6a80") (width 3) (fill "transparent") (glow 1.1)
+    (rect 60 60 780 780)
+    (circle 450 300 90))
+  ; enemies sit clear of the central pillar (450,300 r90): the boss above it, escorts
+  ; to the sides, rushers below — the pillar is cover, not a cage.
+  (spawn "boss" "tank" 450 150 -90 (kind "tank") (boss))
+  (spawn "escort_l" "sniper" 170 300 -90 (kind "sniper"))
+  (spawn "escort_r" "sniper" 730 300 -90 (kind "sniper"))
+  (spawn "rusher_1" "rusher" 200 600 0 (kind "rusher"))
+  (spawn "rusher_2" "rusher" 700 600 180 (kind "rusher"))
+  (spawn "heal_1" "powerup" 450 640 0 (kind "heal"))
+  (spawn "shield_1" "shield" 160 760 0 (kind "shield"))
+  ; A way back to the last stage to stock up before the boss. It is SEALED the moment the boss
+  ; falls (engine: winGame -> sealReturnPortals), so once you commit there is no retreat.
+  (spawn "return" "portal" 700 760 0 (kind "portal") (target "map0016"))
+  (zone "checkpoint_1" "circle" 450 720 60 (trigger "checkpoint"))
+  ; boss dies last (shielded until the escorts fall). On clear: a portal tears open where the boss
+  ; stood -> "The Rift" (one-way endless), THEN the victory/scores screen. Order matters: the portal
+  ; must spawn before "win" freezes the frame, so it is waiting when the player chooses to continue.
+  (resolution "cleared" "portal" (target "@rift") (at 450 150))
+  (resolution "cleared" "win")
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid)))

@@ -1,0 +1,27 @@
+(level "map0005"
+  (version 2)
+  (title "Berzerk")
+  (tags "stage")
+  (size 2000 2000)
+  (music "music/Eight_Left_Standing.mp3")
+  (player-start 1000 1840 -90)
+  (entry "enter" 1000 1840 -90)
+  ; A maze of chambers linked by doorways: three staggered walls force a zig-zag climb,
+  ; each gap on the opposite side of the last (right, left, right) up to the exit.
+  (wall "walls"
+    (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
+    (rect 60 60 1880 1880)
+    (rect 60 1440 1240 40)
+    (rect 700 1000 1240 40)
+    (rect 60 560 1240 40))
+  (spawn "grunt_1" "enemy" 420 1660 -90 (kind "enemy"))
+  (spawn "rusher_1" "rusher" 1520 1660 -90 (kind "rusher"))
+  (spawn "rusher_2" "rusher" 1620 1240 180 (kind "rusher"))
+  (spawn "grunt_2" "enemy" 400 800 0 (kind "enemy"))
+  (spawn "rusher_3" "rusher" 1600 780 180 (kind "rusher"))
+  (spawn "grunt_3" "enemy" 520 300 0 (kind "enemy"))
+  (spawn "heal_1" "powerup" 1000 1700 0 (kind "heal"))
+  (spawn "fire_1" "firepower" 400 1250 0 (kind "fire"))
+  (spawn "portal_next" "portal" 1000 180 0 (kind "portal") (target "map0006"))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocyclo
+  settings:
+    gocyclo:
+      min-complexity: 30
+  exclusions:
+    rules:
+      # Long table-driven tests are allowed to be branchy.
+      - path: _test\.go
+        linters:
+          - gocyclo
+      # The vector AppendVertices* API is deprecated but is the only way to get
+      # cacheable mesh vertices for the camera transform (see render/mesh.go).
+      - path: render/mesh\.go
+        text: SA1019
+        linters:
+          - staticcheck

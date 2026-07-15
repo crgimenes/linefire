@@ -1,0 +1,13 @@
+(asset "ratepower"
+  (version 2)
+  (kind "rate")
+  (tags "powerup" "rate")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#60fff0") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 5 5) (line 11 12) (line 5 19))
+    (path (move 12 5) (line 18 12) (line 12 19)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

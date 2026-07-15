@@ -1,0 +1,28 @@
+(level "map0009"
+  (version 2)
+  (title "Gauntlet")
+  (tags "stage")
+  (size 2200 2200)
+  (music "music/Eight_Left_Standing.mp3")
+  (player-start 250 1940 -90)
+  (entry "enter" 250 1940 -90)
+  ; A serpentine labyrinth crossed under pressure: four full-height walls, each with its gap on the
+  ; opposite end from the last, so the only route snakes top-bottom-top-bottom to the far exit while
+  ; a horde keeps spawning in.
+  (wall "walls"
+    (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
+    (rect 60 60 2080 2080)
+    (rect 500 60 40 1600)
+    (rect 900 540 40 1600)
+    (rect 1300 60 40 1600)
+    (rect 1700 540 40 1600))
+  (spawn "sniper_1" "sniper" 300 400 90 (kind "sniper"))
+  (spawn "sniper_2" "sniper" 700 1900 -90 (kind "sniper"))
+  (spawn "enemy_1" "enemy" 1100 400 90 (kind "enemy"))
+  (spawn "enemy_2" "enemy" 1500 1900 -90 (kind "enemy"))
+  (spawn "heal_1" "powerup" 250 1750 0 (kind "heal"))
+  (spawn "shield_1" "shield" 1900 1900 0 (kind "shield"))
+  (spawn "portal_next" "portal" 1950 200 0 (kind "portal") (target "map0010"))
+  (horde (types "enemy" "rusher") (interval 44) (max-alive 12) (ramp 480) (seed 8))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

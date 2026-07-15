@@ -1,0 +1,12 @@
+(asset "wpn_front"
+  (version 2)
+  (kind "weapon-front")
+  (tags "weapon" "front")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#e8ffff") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 2) (line 22 12) (line 12 22) (line 2 12) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

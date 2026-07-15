@@ -1,0 +1,12 @@
+(asset "damagepower"
+  (version 2)
+  (kind "damage")
+  (tags "powerup" "damage")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#ff5050") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 2) (line 14 10) (line 22 12) (line 14 14) (line 12 22) (line 10 14) (line 2 12) (line 10 10) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

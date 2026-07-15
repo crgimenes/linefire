@@ -1,0 +1,14 @@
+(asset "allypower"
+  (version 2)
+  (kind "ally")
+  (tags "powerup" "ally")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#55a0ff") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 3) (line 15 9) (line 12 7) (line 9 9) (close))
+    (path (move 6 13) (line 9 19) (line 6 17) (line 3 19) (close))
+    (path (move 18 13) (line 21 19) (line 18 17) (line 15 19) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

@@ -1,0 +1,13 @@
+(asset "sniper"
+  (version 2)
+  (kind "sniper")
+  (tags "enemy" "sniper" "ranged")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#ffe040") (width 2) (fill "#201c04") (glow 0.8)
+    (path (move 32 6) (line 39 32) (line 32 58) (line 25 32) (close)))
+  (hardpoint "main_gun" "weapon" 32 6 -90)
+  (collision "circle" 32 32 14)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

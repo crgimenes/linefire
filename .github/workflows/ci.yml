@@ -1,0 +1,98 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  # Native per-OS test pass — the real gate. Ebitengine is pure-Go on macOS and
+  # Windows (purego), but needs cgo + X11/OpenGL/ALSA headers on Linux, so Linux is
+  # tested natively here rather than cross-compiled.
+  test:
+    name: test-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install Linux dependencies (Ebitengine)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libc6-dev \
+            libgl1-mesa-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxxf86vm-dev \
+            pkg-config
+      - run: go build ./...
+      - run: go vet ./...
+      # The tests build worlds and assets but never open a window (no RunGame/Draw),
+      # so they run headless. -timeout + timeout-minutes fail a wedged test fast with
+      # a goroutine dump instead of hanging to go test's 10m default.
+      - name: Test
+        timeout-minutes: 10
+        run: go test -timeout 120s -count 1 ./...
+
+  # Compile-check the pure-Go release targets (what `make release` ships). Linux is
+  # excluded on purpose: it needs cgo and is built natively (test job + release-linux).
+  cross-build:
+    name: cross-build-${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -ldflags="-s -w" ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # golangci-lint type-checks the native (linux) build, whose Ebitengine cgo needs
+      # these headers to preprocess.
+      - name: Install Linux dependencies (Ebitengine)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libc6-dev \
+            libgl1-mesa-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxxf86vm-dev \
+            pkg-config
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+      - name: Lint
+        run: $(go env GOPATH)/bin/golangci-lint run ./...

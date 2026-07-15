@@ -1,0 +1,12 @@
+(asset "wpn_mine"
+  (version 2)
+  (kind "weapon-mine")
+  (tags "weapon" "mine")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#ffd040") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 2) (line 22 12) (line 12 22) (line 2 12) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

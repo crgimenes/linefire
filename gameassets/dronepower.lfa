@@ -1,0 +1,13 @@
+(asset "dronepower"
+  (version 2)
+  (kind "drone")
+  (tags "powerup" "drone")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#80c0ff") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 9) (line 15 12) (line 12 15) (line 9 12) (close))
+    (path (move 12 2) (line 19 5) (line 22 12) (line 19 19) (line 12 22) (line 5 19) (line 2 12) (line 5 5) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

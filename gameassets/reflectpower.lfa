@@ -1,0 +1,13 @@
+(asset "reflectpower"
+  (version 2)
+  (kind "reflect")
+  (tags "powerup" "reflect")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#c080ff") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 3) (line 20 7) (line 20 13) (line 12 21) (line 4 13) (line 4 7) (close))
+    (path (move 8 12) (line 12 8) (line 12 10) (line 16 10) (line 16 14) (line 12 14) (line 12 16) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

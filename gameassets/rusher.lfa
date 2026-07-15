@@ -1,0 +1,13 @@
+(asset "rusher"
+  (version 2)
+  (kind "rusher")
+  (tags "enemy" "rusher" "fast")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#ff40c0") (width 2) (fill "#1c0418") (glow 0.8)
+    (path (move 32 14) (line 44 42) (line 32 34) (line 20 42) (close)))
+  (hardpoint "main_gun" "weapon" 32 14 -90)
+  (collision "circle" 32 30 12)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

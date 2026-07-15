@@ -1,0 +1,13 @@
+(asset "shield"
+  (version 2)
+  (kind "shield")
+  (tags "powerup" "shield")
+  (size 48 48)
+  (origin 24 24)
+  (layer "main"
+    (stroke "#60d0ff") (width 2) (fill "#08202c") (glow 0.9)
+    (path (move 24 4) (line 40 14) (line 40 34) (line 24 44) (line 8 34) (line 8 14) (close)))
+  (collision "circle" 24 24 18)
+  (sound "pickup" "collect_soft" (seed 21) (volume 0.6))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

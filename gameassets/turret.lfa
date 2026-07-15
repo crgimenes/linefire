@@ -1,0 +1,14 @@
+(asset "turret"
+  (version 2)
+  (kind "turret")
+  (tags "enemy" "turret" "stationary")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#ff9030") (width 2) (fill "#241206") (glow 0.8)
+    (path (move 54 32) (line 48 48) (line 32 54) (line 16 48) (line 10 32) (line 16 16) (line 32 10) (line 48 16) (close))
+    (path (move 28 18) (line 36 18) (line 36 2) (line 28 2) (close)))
+  (hardpoint "main_gun" "weapon" 32 2 -90)
+  (collision "circle" 32 32 22)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

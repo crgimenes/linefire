@@ -1,0 +1,12 @@
+(asset "powerup"
+  (version 2)
+  (kind "heal")
+  (tags "powerup")
+  (size 48 48)
+  (origin 24 24)
+  (layer "main"
+    (stroke "#60ff90") (width 2) (fill "#0a2014") (glow 0.9)
+    (path (move 20 4) (line 28 4) (line 28 20) (line 44 20) (line 44 28) (line 28 28) (line 28 44) (line 20 44) (line 20 28) (line 4 28) (line 4 20) (line 20 20) (close)))
+  (collision "circle" 24 24 18)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

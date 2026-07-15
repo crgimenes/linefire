@@ -1,0 +1,16 @@
+(asset "tank"
+  (version 2)
+  (kind "tank")
+  (tags "enemy" "tank" "heavy")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#e85a6a") (width 3) (fill "#1e0810") (glow 0.8)
+    (path (move 32 4) (line 56 18) (line 56 46) (line 32 60) (line 8 46) (line 8 18) (close))
+    (path (move 32 20) (line 44 32) (line 32 44) (line 20 32) (close)))
+  (hardpoint "main_gun" "weapon" 32 4 -90)
+  (collision "circle" 32 32 27)
+  (sound "fire" "shot_zap" (seed 71) (volume 0.4))
+  (sound "destroy" "explosion" (seed 91) (volume 0.9))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

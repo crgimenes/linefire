@@ -1,0 +1,26 @@
+(level "map0014"
+  (version 2)
+  (title "Gravitar")
+  (tags "stage")
+  (size 1800 2600)
+  (music "music/Midnight_Override.mp3")
+  (player-start 900 2400 -90)
+  (entry "enter" 900 2400 -90)
+  ; Tight caverns: a narrow zig-zag climb with a tank lurking in each chamber. Squeezing past one
+  ; while it fires is the whole fight.
+  (wall "walls"
+    (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
+    (rect 50 50 1700 2500)
+    (rect 50 2050 1380 70)
+    (rect 370 1600 1380 70)
+    (rect 50 1150 1380 70)
+    (rect 370 700 1380 70))
+  (spawn "tank_1" "tank" 900 1850 -90 (kind "tank"))
+  (spawn "tank_2" "tank" 300 1380 90 (kind "tank"))
+  (spawn "tank_3" "tank" 1400 930 -90 (kind "tank"))
+  (spawn "sniper_1" "sniper" 400 470 0 (kind "sniper"))
+  (spawn "heal_1" "powerup" 900 2250 0 (kind "heal"))
+  (spawn "reflect_1" "reflectpower" 1550 1850 0 (kind "reflect"))
+  (spawn "portal_next" "portal" 900 160 0 (kind "portal") (target "map0015"))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

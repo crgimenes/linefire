@@ -1,0 +1,14 @@
+(asset "seekpower"
+  (version 2)
+  (kind "seek")
+  (tags "powerup" "seek")
+  (size 24 24)
+  (origin 12 12)
+  (layer "main"
+    (stroke "#ffb040") (width 2) (fill "transparent") (glow 0.9)
+    (path (move 12 4) (line 16 6) (line 18 10))
+    (path (move 18 10) (line 15 9) (line 17 7) (close))
+    (path (move 12 8) (line 16 12) (line 12 16) (line 8 12) (close)))
+  (collision "circle" 12 12 16)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

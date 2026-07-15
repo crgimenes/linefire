@@ -1,0 +1,26 @@
+(level "map0011"
+  (version 2)
+  (title "Defender")
+  (tags "stage")
+  (size 2800 1400)
+  (music "music/Midnight_Override.mp3")
+  (player-start 200 700 0)
+  (entry "enter" 200 700 0)
+  ; A long run to the right through staggered barricades while waves of rushers pour in — you make
+  ; ground or you get swarmed.
+  (wall "walls"
+    (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
+    (rect 50 50 2700 1300)
+    (rect 700 50 60 900)
+    (rect 1300 450 60 900)
+    (rect 1900 50 60 900))
+  (spawn "sniper_1" "sniper" 450 300 0 (kind "sniper"))
+  (spawn "enemy_1" "enemy" 1050 1050 -90 (kind "enemy"))
+  (spawn "enemy_2" "enemy" 1650 300 0 (kind "enemy"))
+  (spawn "sniper_2" "sniper" 2250 1050 180 (kind "sniper"))
+  (spawn "heal_1" "powerup" 400 700 0 (kind "heal"))
+  (spawn "seek_1" "seekpower" 1600 1050 0 (kind "seek"))
+  (spawn "portal_next" "portal" 2600 700 0 (kind "portal") (target "map0012"))
+  (horde (types "rusher" "enemy") (interval 40) (max-alive 14) (ramp 420) (seed 10))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

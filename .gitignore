@@ -1,7 +1,5 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Binaries
+linefire-editor
 *.exe
 *.exe~
 *.dll
@@ -11,22 +9,29 @@
 # Test binary, built with `go test -c`
 *.test
 
-# Code coverage profiles and other test artifacts
+# Coverage output
 *.out
-coverage.*
-*.coverprofile
-profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+.DS_Store
 
-# Go workspace file
+# Build output
+dist/
+/bin/
+
+# Go workspace files
 go.work
 go.work.sum
 
-# env file
-.env
+# Default editor output file
+linefire_asset.json
+TODO.md
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# Runtime-generated procedural map chunks
+procmaps/
+**/procmaps/
+
+.DS_Store
+TODO.md
+
+# Internal authoring plan (pt-BR working notes, like TODO.md)
+docs/campaign.md

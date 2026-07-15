@@ -1,0 +1,28 @@
+(level "map0008"
+  (version 2)
+  (title "Tempest")
+  (tags "stage")
+  (size 1600 2600)
+  (music "music/Midnight_Override.mp3")
+  (player-start 800 2400 -90)
+  (entry "enter" 800 2400 -90)
+  ; A winding vertical tunnel climbed in the dark: snipers wait in the alcoves the zig-zag makes,
+  ; each gap on the opposite wall from the last.
+  (wall "walls"
+    (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
+    (rect 50 50 1500 2500)
+    (rect 50 2050 1000 70)
+    (rect 550 1600 1000 70)
+    (rect 50 1150 1000 70)
+    (rect 550 700 1000 70))
+  (spawn "sniper_1" "sniper" 1250 2250 -90 (kind "sniper"))
+  (spawn "sniper_2" "sniper" 300 1850 0 (kind "sniper"))
+  (spawn "sniper_3" "sniper" 1250 1400 180 (kind "sniper"))
+  (spawn "sniper_4" "sniper" 300 950 0 (kind "sniper"))
+  (spawn "rusher_1" "rusher" 300 2250 0 (kind "rusher"))
+  (spawn "enemy_1" "enemy" 800 350 -90 (kind "enemy"))
+  (spawn "heal_1" "powerup" 800 2250 0 (kind "heal"))
+  (spawn "rate_1" "ratepower" 1250 950 0 (kind "rate"))
+  (spawn "portal_next" "portal" 800 160 0 (kind "portal") (target "map0009"))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 20) (snap-to-grid))
+)

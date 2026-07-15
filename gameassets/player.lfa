@@ -1,0 +1,16 @@
+(asset "player"
+  (version 2)
+  (tags "player" "ship")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#80ffff") (width 2) (fill "#001820") (glow 0.8)
+    (path (move 32 6) (line 52 54) (line 32 44) (line 12 54) (close)))
+  (hardpoint "main_gun" "weapon" 32 8 -90)
+  (hardpoint "wing_l" "weapon" 16 46 -90)
+  (hardpoint "wing_r" "weapon" 48 46 -90)
+  (hardpoint "core" "weapon" 32 30 -90)
+  (collision "circle" 32 34 22)
+  (sound "thruster" "engine" (seed 700) (volume 0.2) (continuous))
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

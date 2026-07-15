@@ -1,0 +1,13 @@
+(asset "enemy"
+  (version 2)
+  (kind "enemy")
+  (tags "enemy" "ship")
+  (size 64 64)
+  (origin 32 32)
+  (layer "main"
+    (stroke "#ff5a4a") (width 2) (fill "#240a08") (glow 0.8)
+    (path (move 32 6) (line 42 30) (line 58 46) (line 38 50) (line 32 42) (line 26 50) (line 6 46) (line 22 30) (close)))
+  (hardpoint "main_gun" "weapon" 32 8 -90)
+  (collision "circle" 32 36 20)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)

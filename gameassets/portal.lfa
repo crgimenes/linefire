@@ -1,0 +1,15 @@
+(asset "portal"
+  (version 2)
+  (kind "portal")
+  (tags "portal")
+  (size 56 56)
+  (origin 28 28)
+  (layer "ring"
+    (stroke "#c060ff") (width 2) (fill "#160a24") (glow 1)
+    (path (move 28 4) (line 45 11) (line 52 28) (line 45 45) (line 28 52) (line 11 45) (line 4 28) (line 11 11) (close)))
+  (layer "core"
+    (stroke "#ff90ff") (width 2) (fill "transparent") (glow 1)
+    (path (move 28 16) (line 36 20) (line 40 28) (line 36 36) (line 28 40) (line 20 36) (line 16 28) (line 20 20) (close)))
+  (collision "circle" 28 28 24)
+  (editor (snap) (snap-radius 8) (grid) (grid-size 4))
+)
