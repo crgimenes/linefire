@@ -6,6 +6,15 @@
 > Expect breakage, missing pieces, and changes that break saves and APIs without
 > notice. Do not depend on it for anything yet.
 
+<p align="center">
+  <video src="https://raw.githubusercontent.com/crgimenes/linefire/trunk/web/preview.webm"
+    autoplay loop muted playsinline controls width="480"
+    poster="https://raw.githubusercontent.com/crgimenes/linefire/trunk/web/preview.jpg">
+    (attract-mode footage — see <a href="web/preview.jpg">a screenshot</a> if your
+    viewer doesn't render inline video)
+  </video>
+</p>
+
 Linefire is a 2D twin-stick shoot 'em up written in Go with
 [Ebitengine](https://ebitengine.org), using a vector look with a CRT glow.
 
@@ -24,6 +33,15 @@ This repository contains the game and its editors:
 The game keeps the ship centered on screen always pointing up and
 rotates/translates the world around it; maps are authored top-down in plain 2D
 world coordinates, and that rotation is a runtime camera concern.
+
+## Try it in your browser
+
+**[Open Linefire →](https://crgimenes.github.io/linefire/)**
+
+The game builds to WebAssembly (`make wasm` / `make serve-web`) and plays with
+keyboard/mouse or two thumbs (see [Web build](#web-build) below). Desktop
+browsers run it smoothly; mobile Safari can still exhaust memory during a long
+session — a fix is waiting on a stable Ebitengine release (we track an alpha).
 
 ## Data format: Filo
 
@@ -303,3 +321,7 @@ rather than cross-compiled.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full verify flow and
 conventions. `TODO.md` (Portuguese) tracks the roadmap; `docs/campaign.md` is
 the living campaign plan.
+
+## License
+
+See [LICENSE](LICENSE) (MIT).
