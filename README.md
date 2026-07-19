@@ -6,14 +6,10 @@
 > Expect breakage, missing pieces, and changes that break saves and APIs without
 > notice. Do not depend on it for anything yet.
 
-<p align="center">
-  <video src="https://raw.githubusercontent.com/crgimenes/linefire/trunk/web/preview.webm"
-    autoplay loop muted playsinline controls width="480"
-    poster="https://raw.githubusercontent.com/crgimenes/linefire/trunk/web/preview.jpg">
-    (attract-mode footage — see <a href="web/preview.jpg">a screenshot</a> if your
-    viewer doesn't render inline video)
-  </video>
-</p>
+![Linefire attract mode](web/preview.gif)
+
+*(attract mode — the game playing itself; [preview.webm](web/preview.webm) for a
+sharper, smaller capture of the same clip)*
 
 Linefire is a 2D twin-stick shoot 'em up written in Go with
 [Ebitengine](https://ebitengine.org), using a vector look with a CRT glow.
