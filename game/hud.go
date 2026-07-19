@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"image/color"
+	"runtime"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -193,7 +194,7 @@ func (g *Game) drawHUDContent(dst *ebiten.Image) {
 	g.drawMinimap(dst)
 	g.drawWeaponSlots(dst)
 
-	if g.debugHUD {
+	if g.debugHUD || webDebug {
 		g.drawDebug(dst)
 	}
 
@@ -219,12 +220,29 @@ func (g *Game) drawDebug(dst *ebiten.Image) {
 		mode = "flood"
 	}
 	msg := fmt.Sprintf(
-		"FPS %.0f  TPS %.0f\nenemies %d  bullets %d  blur x%d\nmode %s (F2)  fullscreen F11",
-		ebiten.ActualFPS(), ebiten.ActualTPS(),
-		g.enemiesLeft(), len(g.enemyShots)+len(g.projectiles), g.blurSamples(),
+		"FPS %.0f  TPS %.0f  %s\nenemies %d  bullets %d  blur x%d  scale %.1f\nmode %s (F2)  fullscreen F11",
+		ebiten.ActualFPS(), ebiten.ActualTPS(), g.memStatLine(),
+		g.enemiesLeft(), len(g.enemyShots)+len(g.projectiles), g.blurSamples(), g.dpr,
 		mode,
 	)
 	ebitenutil.DebugPrintAt(dst, msg, 12, dst.Bounds().Dy()-58)
+}
+
+// memStatLine reports the memory picture, refreshed every ~half second (ReadMemStats
+// briefly stops the world, so not per frame): the live Go heap, the total memory the
+// runtime took from the OS (on wasm this is the linear memory, which NEVER shrinks —
+// the number iOS ultimately kills the tab over), and completed GC cycles. Watching it
+// on a device is how a "starts fast, slowly dies" report becomes a diagnosis.
+func (g *Game) memStatLine() string {
+	g.memTick--
+	if g.memLine == "" || g.memTick <= 0 {
+		g.memTick = 30
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		g.memLine = fmt.Sprintf("heap %dMB  sys %dMB  gc %d",
+			m.HeapAlloc/(1<<20), m.Sys/(1<<20), m.NumGC)
+	}
+	return g.memLine
 }
 
 // drawLifePip draws one life indicator as an upward-pointing triangle.

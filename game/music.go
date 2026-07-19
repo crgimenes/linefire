@@ -145,8 +145,8 @@ func (b *soundBank) musicSource(name string, seed int64, loop bool) io.Reader {
 // when it is already the one playing. loop keeps it looping (the default); pass false for a
 // one-shot track. Nil-safe and silent when muted or the theme is unknown.
 func (b *soundBank) playMusic(name string, seed int64, loop bool) {
-	if b == nil {
-		return
+	if b == nil || webFlag("nomusic") {
+		return // ?nomusic (web A/B): SFX stay, but no track — no streaming mp3 decode on the main thread
 	}
 	key := "music:" + soundKey(name, seed)
 	if b.musicKey == key && b.music != nil && b.music.IsPlaying() {
@@ -268,6 +268,9 @@ func (g *Game) nextCreditsTrack(cur string) string {
 // prewarmTheme readies a theme for instant playback: file bytes read, or the gion
 // track rendered.
 func (b *soundBank) prewarmTheme(name string, seed int64) {
+	if webFlag("nomusic") {
+		return
+	}
 	if sfx.IsMusicFile(name) {
 		b.fileBytes(name)
 		return

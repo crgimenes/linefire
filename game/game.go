@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"math"
 	"math/rand/v2"
+	"runtime"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -105,6 +106,8 @@ type Game struct {
 	floodView bool       // render the flood-fill glow map instead of line walls (F2)
 	simpleMap bool       // skip flood + fog (procedural map): fast render, cheap rebuild
 	debugHUD  bool       // show the developer overlay (F3): FPS/TPS, counts, mode
+	memLine   string     // cached memory readout for the debug overlay
+	memTick   int        // frames until the memory readout refreshes
 	mapOpen   bool       // the full-screen automap is open (M)
 	mapZoom   float64    // automap zoom factor
 	roundView bool       // mask the view to a circle ("porthole") (F4)
@@ -463,18 +466,21 @@ func Run(content fs.FS, player *asset.Asset, lvl *level.Level, mapDir, mapName s
 	g.mapName = mapName
 	g.startMap = mapName                  // remember where the campaign began, so a victory can replay it
 	g.titleBannerTicks = stageTitleFrames // flash the opening stage's title
-	g.sfx = newSoundBank()                // create the audio context here (not in New), so tests stay headless
-	g.sfx.content = content               // serve music from the same bundle as the rest of the data
-	cfgPath, err := filoio.ConfigPath()
-	if err == nil {
-		cfg := filoio.LoadConfig(cfgPath)
-		g.sfx.cfgPath = cfgPath
-		g.sfx.master = cfg.Volume
-		g.sfx.muted = cfg.Muted
-		g.sfx.highScore = cfg.HighScore
+	webDebug = webFlag("debug")           // web A/B: the debug overlay everywhere, attract included
+	if !webFlag("noaudio") {              // web A/B: no audio context at all — zero audio cost on the wasm main thread
+		g.sfx = newSoundBank()  // create the audio context here (not in New), so tests stay headless
+		g.sfx.content = content // serve music from the same bundle as the rest of the data
+		cfgPath, err := filoio.ConfigPath()
+		if err == nil {
+			cfg := filoio.LoadConfig(cfgPath)
+			g.sfx.cfgPath = cfgPath
+			g.sfx.master = cfg.Volume
+			g.sfx.muted = cfg.Muted
+			g.sfx.highScore = cfg.HighScore
+		}
+		g.sfx.prewarm(weaponCatalog)
+		g.prewarmMusic()
 	}
-	g.sfx.prewarm(weaponCatalog)
-	g.prewarmMusic()
 	g.logf("TIP  salvage a combat computer to unlock auto-fire (G)")
 	g.logf("TIP  fly over a weapon to swap; your fire can break pickups")
 	g.enterTitle() // open on the title screen (attract demo) rather than straight into play
@@ -485,10 +491,7 @@ func Run(content fs.FS, player *asset.Asset, lvl *level.Level, mapDir, mapName s
 // draws into is sized in device pixels and mapped 1:1 to the framebuffer, so
 // vector strokes are anti-aliased at full resolution with no resampling step.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	scale := ebiten.Monitor().DeviceScaleFactor()
-	if scale <= 0 {
-		scale = 1
-	}
+	scale := capScale(ebiten.Monitor().DeviceScaleFactor())
 	if outsideWidth <= 0 || outsideHeight <= 0 {
 		outsideWidth, outsideHeight = screenW, screenH
 	}
@@ -549,6 +552,8 @@ func (g *Game) Update() error {
 	g.sfx.update()    // tick sound throttles + prune finished players (nil-safe)
 	g.laserOn = false // re-asserted each frame the beam is actually held
 
+	g.stepForcedGC() // web only: run finalizers so dead map/arena textures actually free
+	g.updateTouch()  // track thumbs first, so every branch below sees fresh touch state
 	g.updateHotkeys()
 
 	// The credits attract screen: it owns Esc (exit) and the Konami code, then the
@@ -581,9 +586,9 @@ func (g *Game) Update() error {
 			g.enterCreditsReturning() // roll the credits; Esc will come back to this game-over screen
 			return nil
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+		if inpututil.IsKeyJustPressed(ebiten.KeyR) || touchJustTapped() {
 			if g.checkpoint.valid && !shiftHeld() {
-				g.restoreCheckpoint() // R: back to the last checkpoint with the run intact
+				g.restoreCheckpoint() // R (or a tap): back to the last checkpoint with the run intact
 			} else {
 				mapDir, mapName, simple := g.mapDir, g.mapName, g.simpleMap
 				sfx := g.sfx // the audio context is a process singleton: carry it over
@@ -748,6 +753,9 @@ func (g *Game) readManualInput() bool {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.fireSlotInput(0, inpututil.IsKeyJustPressed(ebiten.KeySpace)) // Space fires the forward nose gun
+	}
+	if g.applyTouchControls() { // thumbs stack with the keys; a no-op with no touch
+		thrusting = true
 	}
 	return thrusting
 }
@@ -944,6 +952,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	g.drawHUD(screen)
+	g.drawTouchSticks(screen) // live thumbs + pause spot; invisible until a finger has landed
 
 	if g.mapOpen {
 		g.presentOverlay(screen, g.drawMapScreen)
@@ -1173,10 +1182,45 @@ func (g *Game) blurSamples() int {
 	if samples < 1 {
 		return 1
 	}
-	if samples > maxBlurSamples {
-		return maxBlurSamples
+	if samples > blurSampleCap { // the platform profile's budget (native: maxBlurSamples)
+		return blurSampleCap
 	}
 	return samples
+}
+
+// gcTick counts frames toward the platform profile's forced-GC cadence. Package level
+// (not on Game) so world resets never restart the countdown.
+var gcTick int
+
+// webDebug forces the debug overlay on everywhere (play.html?debug), attract included —
+// the on-device way to watch FPS and memory without a keyboard. Package level so world
+// resets never drop it.
+var webDebug bool
+
+// stepForcedGC runs the Go GC on the platform profile's cadence (web only; a no-op
+// natively). See perf_js.go for why: ebiten frees GPU textures via finalizers, and a
+// small stable heap means automatic GC — and therefore the freeing — rarely happens.
+func (g *Game) stepForcedGC() {
+	if forceGCEvery <= 0 {
+		return
+	}
+	gcTick++
+	if gcTick >= forceGCEvery {
+		gcTick = 0
+		runtime.GC()
+	}
+}
+
+// capScale clamps the OS device scale factor to the platform render profile: uncapped
+// on native, 1× on the web (see perf_js.go). Pure, so the clamp is testable.
+func capScale(scale float64) float64 {
+	if scale <= 0 {
+		scale = 1
+	}
+	if renderScaleCap > 0 && scale > renderScaleCap {
+		return renderScaleCap
+	}
+	return scale
 }
 
 // frameMargin is the device-pixel padding around the screen in the frame buffer:

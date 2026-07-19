@@ -36,10 +36,11 @@ func (g *Game) aimAngleForCamera() float64 {
 	return g.angle
 }
 
-// aimDir is the unit world-space direction from the ship to the mouse cursor.
+// aimDir is the unit world-space direction from the ship to the pointer — the mouse
+// cursor, or the turret stick's synthetic point while a touch drag is aiming.
 func (g *Game) aimDir() (float64, float64, bool) {
-	mx, my := ebiten.CursorPosition()
-	return g.aimDirFrom(float64(mx), float64(my))
+	mx, my := g.pointerPos()
+	return g.aimDirFrom(mx, my)
 }
 
 // aimDirFrom converts a screen position to a unit world-space direction from the
@@ -72,8 +73,8 @@ func (g *Game) crosshairPos() (float32, float32) {
 			return float32(px), float32(py)
 		}
 	}
-	mxi, myi := ebiten.CursorPosition()
-	return float32(mxi), float32(myi)
+	px, py := g.pointerPos()
+	return float32(px), float32(py)
 }
 
 // drawCrosshair draws a small cross at the aim reticle. In screen mode it sits

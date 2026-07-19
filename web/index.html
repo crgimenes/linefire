@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linefire — a vector shoot'em up in your browser</title>
+<meta name="description" content="A CRT-glow vector twin-stick shoot'em up: a 16-stage campaign, destructible rock, and an endless one-way Rift. Runs in the browser, keyboard or two thumbs.">
+
+<meta property="og:title" content="Linefire — vector shoot'em up">
+<meta property="og:description" content="A CRT-glow vector twin-stick shoot'em up: a 16-stage campaign, destructible rock, and an endless one-way Rift. Runs in the browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://crgimenes.github.io/linefire/">
+
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #06080c;
+  --panel: #0d1219;
+  --line: #1b2430;
+  --fg: #e6e8ec;
+  --dim: #9aa3af;
+  --accent: #70e0ff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 2rem 1rem 3rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 1100px; margin: 0 auto; }
+main > *:not(#stage) { max-width: 900px; }
+h1 {
+  font-size: 1.7rem;
+  margin: 0 0 .25rem;
+  letter-spacing: .28em;
+  color: var(--accent);
+  text-shadow: 0 0 14px rgba(112, 224, 255, .45);
+}
+h2 { font-size: 1.1rem; margin: 2.5rem 0 .75rem; }
+.tagline { color: var(--dim); margin: 0 0 1.5rem; }
+a { color: var(--accent); }
+#stage {
+  position: relative;
+  width: 100%;
+  /* Tall enough for the square-ish playfield plus HUD; the game adapts to any size. */
+  height: min(78vh, 860px);
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+#stage iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.actions { margin: .6rem 0 0; font-size: .9rem; color: var(--dim); }
+table { border-collapse: collapse; font-size: .95rem; }
+td { padding: .15rem .9rem .15rem 0; vertical-align: top; }
+td:first-child { color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+footer { margin-top: 3rem; color: var(--dim); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>LINEFIRE</h1>
+  <p class="tagline">A CRT-glow vector shoot'em up: 16 hand-drawn stages, destructible rock,
+  and — past the final boss — an endless one-way Rift played for score. Right here in the browser.</p>
+
+  <div id="stage">
+    <iframe src="play.html" title="Linefire" allow="fullscreen; autoplay"></iframe>
+  </div>
+  <p class="actions">Click the game to give it the keyboard ·
+    <a href="play.html">open full screen</a> (recommended on a phone)</p>
+
+  <h2>Touch — two thumbs</h2>
+  <div class="card">
+    <p><b>Left thumb</b> — steering: touch anywhere on the left half and push where you want
+    to go; the ship turns there and thrusts while the stick is deflected.</p>
+    <p><b>Right thumb</b> — fire: hold to shoot the nose gun straight ahead; <i>sweep</i> past
+    a short distance and it becomes the turret stick — the drag direction aims, and it fires
+    for as long as the finger is down.</p>
+    <p>Tap the top-left corner to pause. On the title and game-over screens, any tap continues.</p>
+  </div>
+
+  <h2>Keyboard</h2>
+  <table>
+    <tr><td>WASD / arrows</td><td>turn and thrust (S reverse, ↓ brakes), Q/E strafe, Shift boost</td></tr>
+    <tr><td>Space</td><td>nose gun (forward)</td></tr>
+    <tr><td>mouse + left button</td><td>aim and fire the turret · Tab toggles aim lock</td></tr>
+    <tr><td>1 / 2</td><td>cycle each mount through the collected arsenal</td></tr>
+    <tr><td>G</td><td>auto-fire, once you salvage a combat computer</td></tr>
+    <tr><td>M</td><td>full-screen automap · Esc pause</td></tr>
+  </table>
+
+  <h2>About</h2>
+  <p>The world is destructible: shots dig through rock, and digging past a map's edge warps
+  into a fresh procedural screen. Clear a room and its exit opens. Kill the final boss and a
+  portal tears open where it fell — a one-way trap into <b>The Rift</b>, an endless chain of
+  harder and harder screens, until death. The counter says <b>ENEMIES</b>; at zero, move on.</p>
+  <p>Written in Go with <a href="https://ebitengine.org">Ebitengine</a>; everything on screen
+  is vectors with a CRT bloom, and all sound effects are synthesized at runtime.
+  Source at <a href="https://github.com/crgimenes/linefire">github.com/crgimenes/linefire</a>.</p>
+
+  <footer>© crgimenes — Linefire runs entirely in your browser; nothing is uploaded anywhere.</footer>
+</main>
+</body>
+</html>

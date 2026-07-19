@@ -4,6 +4,8 @@
 #   make build       — build every cmd/<name> for the current OS/arch into bin/
 #   make build-cross — also build for linux/amd64
 #   make release     — standalone game binaries (embedded data) for the desktop matrix
+#   make wasm        — the web build into web/ (linefire.wasm + wasm_exec.js)
+#   make serve-web   — build wasm and serve web/ locally for a browser test
 #   make run         — run the standalone asset editor (GUI)
 #   make run-edit    — run the unified map/asset editor (GUI)
 #   make run-game    — run the game runtime (GUI)
@@ -29,7 +31,7 @@ VERSION         := $(shell git describe --tags --always --dirty 2>/dev/null || e
 RELEASE_LDFLAGS := -s -w -X main.version=$(VERSION)
 RELEASE_TARGETS := darwin/arm64 darwin/amd64 windows/amd64
 
-.PHONY: all build build-cross release run run-edit run-game check fix fix-inline vet fmt test security tidy clean
+.PHONY: all build build-cross release wasm serve-web run run-edit run-game check fix fix-inline vet fmt test security tidy clean
 
 all: build
 
@@ -45,6 +47,17 @@ build-cross: build
 	  GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o bin/$$cmd-linux-amd64 ./cmd/$$cmd ; \
 	  echo "  -> $$cmd (linux-amd64)"; \
 	done
+
+# The web build: what the Pages workflow ships. wasm_exec.js must come from the
+# SAME toolchain that built the module, hence the copy from this GOROOT.
+wasm:
+	GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o web/linefire.wasm ./cmd/linefire
+	@cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
+	@ls -lh web/linefire.wasm | awk '{print "  -> web/linefire.wasm ("$$5")"}'
+
+serve-web: wasm
+	@echo "  -> http://localhost:8080/  (game at /play.html)"
+	@cd web && python3 -m http.server 8080
 
 release:
 	@mkdir -p bin

@@ -97,6 +97,34 @@ strafe, **Shift** afterburner boost, Space / mouse fire, Tab cycles aim modes,
 mute, `F2` render mode, `F3` debug HUD, `F11` fullscreen, Esc pause menu (with
 volume, restart and quit).
 
+**Touch (two thumbs).** Each half of the screen is a floating stick that appears
+where the finger lands. Left thumb: push where you want to go — the ship turns
+there and thrusts while deflected. Right thumb: hold to fire the nose gun
+straight ahead; sweep past a short distance and it becomes the turret stick (the
+drag direction aims, firing while held). Tap the top-center bars to pause; on
+the title/game-over screens any tap continues. Keyboard and mouse stay live —
+the touch layer is additive.
+
+## Web build
+
+The game runs in the browser (GitHub Pages): `web/` holds the site —
+`index.html` (landing + iframe embed) and `play.html` (the canvas document) —
+and the Pages workflow builds `linefire.wasm` + copies `wasm_exec.js` on every
+push to trunk. Because all game data is embedded, the wasm module is the whole
+game (~26 MB, gzipped in transit).
+
+The web build renders on a lighter profile (`game/perf_js.go`): the offscreen is
+capped at 1× — a phone's 3× device scale would make every full-screen pass ~9×
+the pixels and WebGL crawls — and the motion-blur budget is smaller. The browser
+upscales the frame, which the CRT-glow look absorbs. On a touch device, a THIRD
+finger (with both thumbs down) toggles the debug readout (FPS/TPS, blur, scale),
+the touch equivalent of F3.
+
+```sh
+make wasm        # build web/linefire.wasm + wasm_exec.js locally
+make serve-web   # ...and serve web/ at http://localhost:8080 for a browser test
+```
+
 The world is destructible: shots and explosions dig through rock, and digging
 past a map's edge warps into a fresh, harder procedural screen (with a return
 portal home; The Rift has none). The HUD's `ENEMIES` counter

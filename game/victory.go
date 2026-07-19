@@ -103,7 +103,7 @@ func (g *Game) updateVictory() error {
 		g.enterCreditsReturning() // Esc will come back to this victory screen
 		return nil
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) || touchJustTapped() {
 		g.resumeAfterWin() // keep flying: the boss's portal into the Rift is open where it fell
 	}
 	return nil
@@ -138,7 +138,7 @@ func (g *Game) restartCampaign() {
 	}
 	mapDir, startMap := g.mapDir, g.startMap
 	sfx := g.sfx // the audio context is a process singleton: carry it over
-	*g = *New(g.player, lvl, mapDir, false)
+	*g = *newWithContent(g.content, g.player, lvl, mapDir, false)
 	g.mapName, g.startMap, g.sfx = name, startMap, sfx
 	if g.sfx != nil {
 		g.sfx.demoMute = false // a fresh run is audible; drop any lingering credits-demo mute

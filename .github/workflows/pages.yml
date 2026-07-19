@@ -1,0 +1,72 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - trunk
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and never cancel one midway: a half-published site is
+# worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The game data (gameassets/ + music/) is go:embed'ded, so the module is
+      # the whole game — the site ships just the wasm, the JS shim and two pages.
+      - name: Build WebAssembly
+        env:
+          GOARCH: wasm
+          GOOS: js
+        run: go build -trimpath -ldflags="-s -w" -o web/linefire.wasm ./cmd/linefire
+
+      # wasm_exec.js is the Go runtime shim and has to match the toolchain that
+      # produced the module, so it gets copied from this GOROOT rather than
+      # committed to the repo and left to drift.
+      - name: Copy the Go WebAssembly runtime
+        run: cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
+
+      # Cache-bust the module and stamp the build: mobile Safari served a STALE wasm
+      # during the iPhone playtests, silently voiding an A/B round. The commit-suffixed
+      # URL makes every deploy a distinct cache entry, and the visible stamp on the
+      # loader answers "which build am I actually running" from the device itself.
+      - name: Cache-bust the module and stamp the build
+        run: |
+          sed -i "s/fetch(\"linefire.wasm\")/fetch(\"linefire.wasm?v=${GITHUB_SHA::8}\")/" web/play.html
+          sed -i "s/About 10 MB to download\./About 10 MB to download. Build ${GITHUB_SHA::8}./" web/play.html
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

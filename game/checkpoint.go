@@ -137,7 +137,7 @@ func (g *Game) restoreCheckpoint() {
 	ticks := g.runTicks    // RTA speedrun clock: a death does not rewind it
 	startMap := g.startMap // the campaign origin is not part of a checkpoint; it outlives one
 	runLog := g.runLog     // the stages already summarized survive a death, like the RTA clock
-	*g = *New(g.player, cp.level, cp.mapDir, cp.simpleMap)
+	*g = *newWithContent(g.content, g.player, cp.level, cp.mapDir, cp.simpleMap)
 	g.sfx = sfx
 	g.runTicks = ticks
 	g.startMap = startMap

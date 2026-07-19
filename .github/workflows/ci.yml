@@ -44,8 +44,10 @@ jobs:
         timeout-minutes: 10
         run: go test -timeout 120s -count 1 ./...
 
-  # Compile-check the pure-Go release targets (what `make release` ships). Linux is
-  # excluded on purpose: it needs cgo and is built natively (test job + release-linux).
+  # Compile-check the pure-Go release targets (what `make release` ships) plus the
+  # web build. Linux is excluded on purpose: it needs cgo and is built natively
+  # (test job + release-linux). js/wasm builds only the game — the editors need
+  # OS dialogs and subprocesses that have no browser equivalent.
   cross-build:
     name: cross-build-${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
@@ -53,9 +55,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { goos: darwin, goarch: amd64 }
-          - { goos: darwin, goarch: arm64 }
-          - { goos: windows, goarch: amd64 }
+          - { goos: darwin, goarch: amd64, pkg: "./..." }
+          - { goos: darwin, goarch: arm64, pkg: "./..." }
+          - { goos: windows, goarch: amd64, pkg: "./..." }
+          - { goos: js, goarch: wasm, pkg: "./cmd/linefire" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -66,7 +69,7 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -ldflags="-s -w" ./...
+        run: go build -trimpath -ldflags="-s -w" ${{ matrix.pkg }}
 
   lint:
     runs-on: ubuntu-latest

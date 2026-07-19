@@ -111,7 +111,7 @@ func (g *Game) buildCreditsArena() {
 	name := creditsMapName
 	mapDir, startMap := g.mapDir, g.startMap
 	sfx := g.sfx
-	*g = *New(g.player, lvl, mapDir, false)
+	*g = *newWithContent(g.content, g.player, lvl, mapDir, false)
 	g.sfx, g.mapName, g.startMap = sfx, name, startMap
 
 	// Basic loadout: front gun (slot 0) + laser turret (slot 1) + fire computer. Weaker than the
@@ -169,8 +169,8 @@ func (g *Game) stepCreditsMeta() bool {
 		return false          // resume the meta next frame on the new arena
 	}
 	if g.titleMode {
-		if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-			g.restartCampaign() // Space begins a real run from level 1 (New() clears title/demo state)
+		if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) || touchJustTapped() {
+			g.restartCampaign() // Space (or a tap) begins a real run from level 1
 			return true
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
@@ -179,7 +179,7 @@ func (g *Game) stepCreditsMeta() bool {
 		}
 		return false // Esc (quit) is handled in Update, where it can end the program
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) || (!g.creditsPlayable && touchJustTapped()) {
 		if g.screenReturn != nil {
 			sfx := g.sfx         // keep the live audio context (the snapshot shares it, but be explicit)
 			*g = *g.screenReturn // back to the screen the credits were opened from (title / game over / victory)
@@ -384,6 +384,9 @@ func (g *Game) drawCredits(screen *ebiten.Image) {
 }
 
 func (g *Game) drawCreditsContent(dst *ebiten.Image) {
+	if g.debugHUD || webDebug {
+		g.drawDebug(dst) // ?debug (or F3): telemetry over the attract too, so a device can watch it idle
+	}
 	if g.titleMode {
 		g.drawTitle(dst)
 		return

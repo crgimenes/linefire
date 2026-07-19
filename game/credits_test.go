@@ -1,13 +1,39 @@
 package game
 
 import (
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"io/fs"
 	"testing"
 
 	"github.com/hajimehoshi/ebiten/v2"
+
+	"linefire/asset"
+	"linefire/filoio"
+	"linefire/level"
 )
+
+// markerFS is a distinguishable content FS: loads fail soft (nil-mesh entities), but the
+// pointer identity survives, so a test can assert a world reset kept the SAME content.
+type markerFS struct{}
+
+func (*markerFS) Open(string) (fs.File, error) { return nil, fs.ErrNotExist }
+
+// TestWorldResetsKeepContentFS: every *g = *New-style reset must carry g.content — on the
+// web build the content is an embedded bundle, and a reset that falls back to the OS
+// filesystem strands the campaign ("could not load start map", found in the wasm playtest).
+func TestWorldResetsKeepContentFS(t *testing.T) {
+	content := &markerFS{}
+	g := newWithContent(content, asset.New(), level.New(), "gameassets", false)
+
+	g.buildCreditsArena()
+	if g.content != fs.FS(content) {
+		t.Fatal("buildCreditsArena must keep the content FS (the attract demo dropped the embedded bundle)")
+	}
+
+	g.restartCampaign()
+	if g.content != fs.FS(content) {
+		t.Fatal("restartCampaign must keep the content FS")
+	}
+}
 
 // TestCreditsReturnsToPreviousScreen: opening the credits from a non-playable screen stashes
 // that screen so backing out restores it exactly, instead of dropping into a game (the bug

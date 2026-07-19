@@ -100,7 +100,7 @@ func (g *Game) rebuildProcedural(lvl *level.Level, cx, cy int) {
 	px, py, ang := g.x, g.y, g.angle
 	vx, vy := g.vx, g.vy
 
-	*g = *New(g.player, lvl, mapDir, true)
+	*g = *newWithContent(g.content, g.player, lvl, mapDir, true)
 
 	g.health, g.shield, g.lives, g.score = health, shield, lives, score
 	g.dpr, g.sw, g.sh, g.winW, g.winH = dpr, sw, sh, winW, winH

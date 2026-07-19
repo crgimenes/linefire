@@ -35,3 +35,9 @@ TODO.md
 
 # Internal authoring plan (pt-BR working notes, like TODO.md)
 docs/campaign.md
+
+# Web build artifacts (the Pages workflow builds them fresh)
+/web/linefire.wasm
+/web/wasm_exec.js
+
+.claude
