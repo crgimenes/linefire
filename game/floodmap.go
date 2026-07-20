@@ -800,35 +800,52 @@ func (g *Game) drawDug(dst *ebiten.Image, cam ebiten.GeoM) {
 	dst.DrawImage(f.dugImg, &op)
 }
 
+// navigablePath is the flattened wall outline in WORLD space, built once per map
+// (walls never move at runtime; digging edits the flood grid, not the walls).
+// The old fillNavigable re-flattened every curved wall and rebuilt the path in
+// screen space each frame — twice (the carve and the fog mask) — which was pure
+// per-frame CPU churn for geometry that never changes.
+func (g *Game) navigablePath() *vector.Path {
+	if g.navPath != nil {
+		return g.navPath
+	}
+	if g.level == nil {
+		return nil
+	}
+	p := &vector.Path{}
+	for li := range g.level.Walls {
+		for _, wp := range g.level.Walls[li].Paths {
+			fp := wp.Flatten() // curved walls carve as their flattened segments
+			for _, c := range fp.Commands {
+				switch c.Op {
+				case asset.OpMoveTo:
+					p.MoveTo(float32(c.X), float32(c.Y))
+				case asset.OpLineTo:
+					p.LineTo(float32(c.X), float32(c.Y))
+				case asset.OpClose:
+					p.Close()
+				}
+			}
+		}
+	}
+	g.navPath = p
+	return p
+}
+
 // fillNavigable fills the reachable corridors with col, using the even-odd rule
 // over the wall paths: inside the boundary but outside the solid blocks (the
 // corridors) is the odd-overlap region. Assumes closed wall shapes; enclosed
 // pockets would need the flood grid instead (TODO).
 func (g *Game) fillNavigable(dst *ebiten.Image, cam ebiten.GeoM, col color.RGBA) {
-	if g.level == nil {
+	src := g.navigablePath()
+	if src == nil {
 		return
 	}
-	var path vector.Path
-	for li := range g.level.Walls {
-		for _, wp := range g.level.Walls[li].Paths {
-			p := wp.Flatten() // curved walls carve as their flattened segments
-			for _, c := range p.Commands {
-				switch c.Op {
-				case asset.OpMoveTo:
-					sx, sy := cam.Apply(c.X, c.Y)
-					path.MoveTo(float32(sx), float32(sy))
-				case asset.OpLineTo:
-					sx, sy := cam.Apply(c.X, c.Y)
-					path.LineTo(float32(sx), float32(sy))
-				case asset.OpClose:
-					path.Close()
-				}
-			}
-		}
-	}
+	g.navWork.Reset()
+	g.navWork.AddPath(src, &vector.AddPathOptions{GeoM: cam})
 	var cs ebiten.ColorScale
 	cs.ScaleWithColor(col)
-	vector.FillPath(dst, &path, &vector.FillOptions{FillRule: vector.FillRuleEvenOdd}, &vector.DrawPathOptions{
+	vector.FillPath(dst, &g.navWork, &vector.FillOptions{FillRule: vector.FillRuleEvenOdd}, &vector.DrawPathOptions{
 		ColorScale: cs,
 		AntiAlias:  true,
 	})

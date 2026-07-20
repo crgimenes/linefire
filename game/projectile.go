@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"linefire/asset"
 )
@@ -106,19 +105,6 @@ func (g *Game) drawMuzzleFlash(dst *ebiten.Image, cam ebiten.GeoM, col color.RGB
 	c := col
 	c.A = uint8(float64(col.A) * frac)
 	fillCircle(dst, cx, cy, radius*g.dpr*frac, c)
-}
-
-// fillCircle fills an anti-aliased disc in device pixels.
-func fillCircle(dst *ebiten.Image, cx, cy, r float64, col color.RGBA) {
-	var p vector.Path
-	p.Arc(float32(cx), float32(cy), float32(r), 0, 2*math.Pi, vector.Clockwise)
-	p.Close()
-	var cs ebiten.ColorScale
-	cs.ScaleWithColor(col)
-	vector.FillPath(dst, &p, &vector.FillOptions{}, &vector.DrawPathOptions{
-		AntiAlias:  true,
-		ColorScale: cs,
-	})
 }
 
 // stepProjectiles ages the weapon cooldowns and advances every player projectile
@@ -345,11 +331,6 @@ func (g *Game) drawShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 		x1, y1 := cam.Apply(p.x, p.y)
 		strokeLine(dst, x0, y0, x1, y1, w*g.dpr, col)
 	}
-}
-
-// strokeLine draws an anti-aliased line in device pixels.
-func strokeLine(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA) {
-	vector.StrokeLine(dst, float32(x0), float32(y0), float32(x1), float32(y1), float32(width), col, true)
 }
 
 // segmentsIntersect reports whether segments p1-p2 and p3-p4 cross, using the

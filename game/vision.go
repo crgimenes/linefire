@@ -10,11 +10,14 @@ import (
 )
 
 const (
-	visRays     = 64   // fill-in rays around the view circle for open directions
-	fogCell     = 24.0 // discovery grid cell size (the logic grid for fogHidden)
-	fogTexScale = 1.5  // fog texture resolution: texels per world unit (crisp when scaled up)
-	seenStep    = 12.0 // sampling step when clipping walls to the cleared region (maps)
+	visRays  = 64   // fill-in rays around the view circle for open directions
+	fogCell  = 24.0 // discovery grid cell size (the logic grid for fogHidden)
+	seenStep = 12.0 // sampling step when clipping walls to the cleared region (maps)
 )
+
+// fogTexScale (texels per world unit) lives in the platform profile: the fog
+// texture covers the WHOLE map (34 MB on map0001 at 1.5) and one is retained per
+// visited map, so its resolution is a memory knob, not just a quality one.
 
 // fogColor is the fog-of-war layer over never-explored areas. It uses the map's
 // exterior tint (floodFillColor) so unexplored space reads as "solid" negative
@@ -197,14 +200,26 @@ func rayHitsSegment(ox, oy, dx, dy float64, s segment) (float64, bool) {
 // by walls and radius, as world-space points sorted by angle. It casts rays
 // toward each wall corner (plus a tiny offset to peek just past it) and around
 // the view circle, keeping the nearest wall hit (or the radius).
+// Only walls within the radius can shape the polygon (a farther segment cannot
+// beat the radius cap), so the walls are prefiltered once into a reused scratch
+// slice: the cost is quadratic in NEARBY walls, not in the whole map's.
 func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
+	r2 := radius * radius
+	segs := g.visSegs[:0]
+	for _, s := range g.segs {
+		if distPointSegmentSq(ox, oy, s.ax, s.ay, s.bx, s.by) <= r2 {
+			segs = append(segs, s)
+		}
+	}
+	g.visSegs = segs
+
 	type hit struct{ ang, dist float64 }
-	var hits []hit
+	hits := make([]hit, 0, 6*len(segs)+visRays)
 
 	cast := func(ang float64) {
 		dx, dy := math.Cos(ang), math.Sin(ang)
 		best := radius
-		for _, s := range g.segs {
+		for _, s := range segs {
 			t, ok := rayHitsSegment(ox, oy, dx, dy, s)
 			if ok && t < best {
 				best = t
@@ -214,7 +229,7 @@ func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 	}
 
 	const eps = 0.0006
-	for _, s := range g.segs {
+	for _, s := range segs {
 		for _, p := range [2][2]float64{{s.ax, s.ay}, {s.bx, s.by}} {
 			a := math.Atan2(p[1]-oy, p[0]-ox)
 			cast(a - eps)
@@ -273,28 +288,43 @@ func (g *Game) drawBrushFog(screen *ebiten.Image) {
 	// covers maps anywhere — including negative coordinates.
 	ox, oy := g.bounds.minX, g.bounds.minY
 
-	// A tiny halo the size of the ship keeps fog off its own edge (covering the visibility
-	// polygon's apex). It is only as wide as the hull, and collision keeps the hull off walls,
-	// so it can never reveal across one — the fog now strictly respects line of sight.
-	vector.FillCircle(g.fogTex, float32((g.x-ox)*fogTexScale), float32((g.y-oy)*fogTexScale),
-		float32(g.radius*fogTexScale), color.White, true)
+	// The cleared texture is PERSISTENT and the stamp depends only on the ship's
+	// position (rotation never changes line of sight; the polygon tests the static
+	// wall segments), so a ship that has not moved since the last stamp has nothing
+	// new to clear — skip the whole polygon + stamp, the dominant per-frame CPU cost
+	// of the fog. Sub-texel drift accumulates against the last STAMPED position, so
+	// slow motion still re-stamps once it adds up.
+	moved := math.Hypot(g.x-g.fogStampX, g.y-g.fogStampY) >= 0.25
+	if !g.fogStamped || moved {
+		g.fogStamped = true
+		g.fogStampX, g.fogStampY = g.x, g.y
 
-	// Beyond: what the ship sees (the line-of-sight polygon, reaching until walls
-	// stop it — the map diagonal bounds the rays), stamped into the cleared
-	// texture in fog-texture space with a smooth anti-aliased edge.
-	poly := g.visibilityPolygon(g.x, g.y, g.bounds.diagonal())
-	if len(poly) >= 3 {
-		var path vector.Path
-		for i := range poly {
-			tx, ty := float32((poly[i].x-ox)*fogTexScale), float32((poly[i].y-oy)*fogTexScale)
-			if i == 0 {
-				path.MoveTo(tx, ty)
-			} else {
-				path.LineTo(tx, ty)
+		// A tiny halo the size of the ship keeps fog off its own edge (covering the visibility
+		// polygon's apex). It is only as wide as the hull, and collision keeps the hull off walls,
+		// so it can never reveal across one — the fog now strictly respects line of sight.
+		vector.FillCircle(g.fogTex, float32((g.x-ox)*fogTexScale), float32((g.y-oy)*fogTexScale),
+			float32(g.radius*fogTexScale), color.White, true)
+
+		// Beyond: what the ship sees (the line-of-sight polygon, reaching until walls
+		// stop it), stamped into the cleared texture in fog-texture space with a smooth
+		// anti-aliased edge. The rays are bounded to the ON-SCREEN reach (as discovery
+		// is), not the map diagonal: the overlay can only show what is on screen, and
+		// the persistent texture keeps everything ever cleared, so the bound changes
+		// nothing visible while it caps the ray casting at the viewport's size.
+		poly := g.visibilityPolygon(g.x, g.y, g.discoveryReach())
+		if len(poly) >= 3 {
+			var path vector.Path
+			for i := range poly {
+				tx, ty := float32((poly[i].x-ox)*fogTexScale), float32((poly[i].y-oy)*fogTexScale)
+				if i == 0 {
+					path.MoveTo(tx, ty)
+				} else {
+					path.LineTo(tx, ty)
+				}
 			}
+			path.Close()
+			vector.FillPath(g.fogTex, &path, &vector.FillOptions{}, &vector.DrawPathOptions{AntiAlias: true})
 		}
-		path.Close()
-		vector.FillPath(g.fogTex, &path, &vector.FillOptions{}, &vector.DrawPathOptions{AntiAlias: true})
 	}
 
 	// Fog only over the navigable interior (the black playable area). The exterior
