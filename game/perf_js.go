@@ -20,4 +20,11 @@ const (
 	// fast, slowly dies, reloads" cycle from the iPhone playtest). A periodic GC
 	// bounds that lag for a few ms every 10s.
 	forceGCEvery = 600
+
+	// The fog texture covers the whole map and one is RETAINED per visited map
+	// (mapStates), so on the web its resolution is a big slice of the memory that
+	// gets the tab killed: 0.75 is ¼ the bytes of the native 1.5. The fog edge is
+	// soft by design (anti-aliased polygon under a linear upscale), so the lower
+	// resolution reads the same.
+	fogTexScale = 0.75
 )

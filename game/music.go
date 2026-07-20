@@ -149,11 +149,22 @@ func (b *soundBank) playMusic(name string, seed int64, loop bool) {
 		return // ?nomusic (web A/B): SFX stay, but no track — no streaming mp3 decode on the main thread
 	}
 	key := "music:" + soundKey(name, seed)
-	if b.musicKey == key && b.music != nil && b.music.IsPlaying() {
+	if b.musicKey == key && b.onAir() {
 		return // already on air (a finished one-shot is NOT playing, so it restarts below)
 	}
 	b.stopMusic()
 	if b.silent() {
+		return
+	}
+	// Web: MP3 themes go to an HTMLAudioElement so the browser decodes them off
+	// the wasm main thread (see musicweb_js.go). gion tracks fall through to oto.
+	if webAudioMusic && sfx.IsMusicFile(name) {
+		data := b.fileBytes(name)
+		if data == nil {
+			return
+		}
+		b.webMusic = newWebTrack(name, data, loop, b.master*musicVolume)
+		b.musicKey = key
 		return
 	}
 	src := b.musicSource(name, seed, loop)
@@ -170,15 +181,38 @@ func (b *soundBank) playMusic(name string, seed int64, loop bool) {
 	b.musicKey = key
 }
 
+// onAir reports the current track still holds the air: an oto player that is
+// playing, or a web track that has not ended. A web track stuck behind the
+// browser's autoplay gate COUNTS as on air — poke retries it; recreating the
+// element every frame would not get it playing any sooner.
+func (b *soundBank) onAir() bool {
+	if b.webMusic != nil {
+		return !b.webMusic.done()
+	}
+	return b.music != nil && b.music.IsPlaying()
+}
+
 // musicDone reports that a one-shot track has played through to its end. A looping track never
 // finishes, so this only ever fires for the attract demo's non-looping songs.
 func (b *soundBank) musicDone() bool {
-	return b != nil && b.music != nil && !b.music.IsPlaying()
+	if b == nil {
+		return false
+	}
+	if b.webMusic != nil {
+		return b.webMusic.done()
+	}
+	return b.music != nil && !b.music.IsPlaying()
 }
 
 // stopMusic silences the soundtrack.
 func (b *soundBank) stopMusic() {
-	if b == nil || b.music == nil {
+	if b == nil {
+		return
+	}
+	b.webMusic.stop()
+	b.webMusic = nil
+	if b.music == nil {
+		b.musicKey = ""
 		return
 	}
 	_ = b.music.Close()

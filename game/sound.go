@@ -86,6 +86,7 @@ type soundBank struct {
 	loops    map[string]*audio.Player // running continuous sounds, by loop name
 	loopVol  map[string]float64       // each loop's own relative volume (for live master changes)
 	music    *audio.Player            // the looping soundtrack, one track at a time
+	webMusic *webTrack                // web only: MP3 track on an HTMLAudioElement (nil natively)
 	musicKey string                   // cache key of the track on air
 	files    map[string][]byte        // raw music files (mp3), by path
 	content  fs.FS                    // where music files live (embedded bundle or a directory)
@@ -141,6 +142,7 @@ func (b *soundBank) setMaster(v float64) {
 	if b.music != nil {
 		b.music.SetVolume(v * musicVolume)
 	}
+	b.webMusic.setVolume(v * musicVolume)
 }
 
 // saveConfig persists the current audio settings; a missing path (no user config
@@ -235,6 +237,7 @@ func (b *soundBank) update() {
 		_ = p.Close()
 	}
 	b.players = live
+	b.webMusic.poke() // web only: retry a track the autoplay gate held back
 }
 
 // playEvent plays the acting asset's sound for an event, falling back to the

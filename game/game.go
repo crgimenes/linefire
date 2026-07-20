@@ -118,6 +118,9 @@ type Game struct {
 	fogMask   *ebiten.Image // device-res buffer reused for the fog-of-war overlay
 	fogTex    *ebiten.Image // world-space cleared-area texture (fog-of-war brush)
 
+	navPath *vector.Path // flattened wall outline in world space (built once; even-odd fill = corridors)
+	navWork vector.Path  // per-frame scratch: navPath transformed by the camera
+
 	wallMesh   *render.Mesh // walls in world coordinates (built once)
 	wallGlow   *render.Mesh // wall strokes scaled by glow, for the bloom
 	playerMesh *render.Mesh // player asset geometry
@@ -134,6 +137,10 @@ type Game struct {
 
 	discX, discY float64 // ship position at the last fog-discovery scan (skip re-scan when unmoved)
 	discTick     int     // frame counter for the stationary re-scan cadence
+
+	fogStampX, fogStampY float64   // ship position at the last fog-texture stamp (skip when unmoved)
+	fogStamped           bool      // at least one stamp has landed (position (0,0) is a valid start)
+	visSegs              []segment // scratch: walls within the visibility radius, reused per stamp
 
 	boostFuel  float64 // afterburner fuel remaining (0..boostMax)
 	boosting   bool    // the booster is engaged this frame (raises the speed cap)
@@ -904,7 +911,6 @@ func (g *Game) wallImpact(v float64) {
 // poses between the previous and current frame and averaged. The ship itself is
 // fixed at the screen center, so it is drawn once, crisp, on top.
 func (g *Game) Draw(screen *ebiten.Image) {
-	g.ensureFrame()
 	g.refreshFlood() // SPIKE: a dig this frame moves the rock face and its glow
 	g.updateShakeOffset()
 
@@ -974,7 +980,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 // frame padding (sized so a turn never uncovers a corner). The player is not in the
 // frame (it stays fixed at the screen center); Draw composites it separately.
 func (g *Game) accumulateWorld(dst *ebiten.Image) {
-	pad := float64(g.frameMargin())
+	samples := g.blurSamples()
+	m := g.frameMargin()
+	if samples == 1 {
+		// Still or slow: one sample is one exact reprojection of the current pose —
+		// identical to rendering straight to the screen. Skip the padded frame and
+		// the fullscreen blit entirely (menus, the title's idle attract, hovering).
+		// The bloom region keeps the PADDED size in both branches so the glow's
+		// offscreen buffers never reallocate on a still<->moving transition.
+		g.drawWorld(dst, image.Rect(0, 0, g.sw+2*m, g.sh+2*m), g.x, g.y, g.angle, false)
+		return
+	}
+
+	g.ensureFrame()
+	pad := float64(m)
 	fw, fh := g.frame.Bounds().Dx(), g.frame.Bounds().Dy()
 
 	// One render of the world at the current pose, centered in the padded frame.
@@ -982,7 +1001,6 @@ func (g *Game) accumulateWorld(dst *ebiten.Image) {
 	g.drawWorld(g.frame, image.Rect(0, 0, fw, fh), g.x, g.y, g.angle, false)
 	g.camPad = 0
 
-	samples := g.blurSamples()
 	weight := float32(1) / float32(samples)
 	camFinal := g.cameraGeoM() // the pose the frame was rendered at (no pad)
 	inv := camFinal
@@ -1351,7 +1369,7 @@ func (g *Game) drawPortal(dst *ebiten.Image, cam ebiten.GeoM, e *entity) {
 		a := math.Sin(math.Pi * u) // fade in at the rim, out at the centre
 		mc := col
 		mc.A = uint8(235 * a)
-		vector.FillCircle(dst, px, py, float32(1.6*sc), mc, true)
+		fillCircle(dst, float64(px), float64(py), 1.6*sc, mc)
 	}
 }
 
