@@ -138,6 +138,7 @@ func (g *Game) restartCampaign() {
 	}
 	mapDir, startMap := g.mapDir, g.startMap
 	sfx := g.sfx // the audio context is a process singleton: carry it over
+	g.releaseTransientImages()
 	*g = *newWithContent(g.content, g.player, lvl, mapDir, false)
 	g.mapName, g.startMap, g.sfx = name, startMap, sfx
 	if g.sfx != nil {

@@ -1,13 +1,17 @@
 package game
 
 import (
+	"cmp"
 	"image/color"
 	"math"
-	"sort"
+	"slices"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
+
+// visHit is one visibility ray: its angle and how far it reached before rock.
+type visHit struct{ ang, dist float64 }
 
 const (
 	visRays  = 64   // fill-in rays around the view circle for open directions
@@ -234,12 +238,11 @@ func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 		castDist = func(dx, dy float64) float64 { return f.rayToRock(ox, oy, dx, dy, radius) }
 	}
 
-	type hit struct{ ang, dist float64 }
-	hits := make([]hit, 0, 6*len(segs)+visRays)
+	hits := g.visHits[:0]
 
 	cast := func(ang float64) {
 		dx, dy := math.Cos(ang), math.Sin(ang)
-		hits = append(hits, hit{ang, castDist(dx, dy)})
+		hits = append(hits, visHit{ang, castDist(dx, dy)})
 	}
 
 	const eps = 0.0006
@@ -255,11 +258,13 @@ func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 		cast(2 * math.Pi * float64(i) / visRays)
 	}
 
-	sort.Slice(hits, func(i, j int) bool { return hits[i].ang < hits[j].ang })
-	poly := make([]vec2, len(hits))
-	for i, h := range hits {
-		poly[i] = vec2{ox + math.Cos(h.ang)*h.dist, oy + math.Sin(h.ang)*h.dist}
+	g.visHits = hits // keep the grown capacity for the next stamp
+	slices.SortFunc(hits, func(a, b visHit) int { return cmp.Compare(a.ang, b.ang) })
+	poly := g.visPoly[:0]
+	for _, h := range hits {
+		poly = append(poly, vec2{ox + math.Cos(h.ang)*h.dist, oy + math.Sin(h.ang)*h.dist})
 	}
+	g.visPoly = poly
 	return poly
 }
 
@@ -274,15 +279,52 @@ func (g *Game) ensureFogMask() *ebiten.Image {
 // ensureFogTex lazily builds the world-space "cleared" texture: one channel of
 // alpha at fogTexScale texels per world unit, big enough that scaling it to the
 // screen stays crisp (no pixelation) even on large or high-DPI windows.
+// A fresh texture is immediately re-hydrated from the discovery grid, so a
+// revisited map (whose texture was deliberately NOT retained — a full-map GPU
+// image per visited map ratcheted memory) comes back already cleared where the
+// player has been.
 func (g *Game) ensureFogTex() {
 	if g.fogTex != nil || g.level == nil {
 		return
 	}
 	w := int(math.Ceil(g.bounds.w() * fogTexScale))
 	h := int(math.Ceil(g.bounds.h() * fogTexScale))
-	if w > 0 && h > 0 {
-		g.fogTex = ebiten.NewImage(w, h)
+	if w <= 0 || h <= 0 {
+		return
 	}
+	g.fogTex = ebiten.NewImage(w, h)
+	g.rehydrateFogTex()
+}
+
+// rehydrateFogTex re-paints the cleared texture from the discovery grid — the
+// few-KB truth that survives map changes and checkpoints. One cell-resolution
+// mask upscaled through the linear filter: the fog edge comes back a little
+// coarser than the stamped polygons and refines again as the ship flies.
+func (g *Game) rehydrateFogTex() {
+	d := g.disc
+	if d == nil {
+		return
+	}
+	pix := make([]byte, d.cols*d.rows*4)
+	seenAny := false
+	for i, s := range d.seen {
+		if !s {
+			continue
+		}
+		seenAny = true
+		p := i * 4
+		pix[p], pix[p+1], pix[p+2], pix[p+3] = 0xff, 0xff, 0xff, 0xff
+	}
+	if !seenAny {
+		return // a fresh map: nothing to restore
+	}
+	mask := ebiten.NewImage(d.cols, d.rows)
+	mask.WritePixels(pix)
+	var op ebiten.DrawImageOptions
+	op.GeoM.Scale(d.cell*fogTexScale, d.cell*fogTexScale) // cell -> fog texels (both grids share the map origin)
+	op.Filter = ebiten.FilterLinear
+	g.fogTex.DrawImage(mask, &op)
+	mask.Deallocate()
 }
 
 // drawBrushFog overlays the fog of war: the map's exterior tint over everything,
@@ -328,17 +370,17 @@ func (g *Game) drawBrushFog(screen *ebiten.Image) {
 		// nothing visible while it caps the ray casting at the viewport's size.
 		poly := g.visibilityPolygon(g.x, g.y, g.discoveryReach())
 		if len(poly) >= 3 {
-			var path vector.Path
+			g.fogPath.Reset()
 			for i := range poly {
 				tx, ty := float32((poly[i].x-ox)*fogTexScale), float32((poly[i].y-oy)*fogTexScale)
 				if i == 0 {
-					path.MoveTo(tx, ty)
+					g.fogPath.MoveTo(tx, ty)
 				} else {
-					path.LineTo(tx, ty)
+					g.fogPath.LineTo(tx, ty)
 				}
 			}
-			path.Close()
-			vector.FillPath(g.fogTex, &path, &vector.FillOptions{}, &vector.DrawPathOptions{AntiAlias: true})
+			g.fogPath.Close()
+			vector.FillPath(g.fogTex, &g.fogPath, &vector.FillOptions{}, &vector.DrawPathOptions{AntiAlias: true})
 		}
 	}
 

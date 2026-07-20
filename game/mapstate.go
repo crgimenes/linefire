@@ -1,7 +1,5 @@
 package game
 
-import "github.com/hajimehoshi/ebiten/v2"
-
 // mapState remembers what the player already did in a map within the current run,
 // so returning through a portal does not respawn cleared enemies / collected
 // pickups or reset finished objectives. It is keyed by map name and survives the
@@ -19,15 +17,13 @@ type mapState struct {
 	// bitset or RLE when the terrain has to go through a save file (T24).
 	dug []bool
 
-	// disc and fogTex are the fog of war this map has had lifted: the coarse logic grid
-	// (entity culling, minimap) and the high-res world-space cleared texture. They are
-	// held by POINTER and handed straight back on a revisit — nothing is copied.
-	// yagni: fogTex is a full-map GPU image (34 MB for map0001, 7 MB for map0002), so
-	// VRAM grows with the maps visited in a run. If that ever bites, drop the texture
-	// for stale maps and re-stamp it from disc (6.9 KB) — the edge comes back blocky at
-	// the fogCell grid until the player flies past it again.
-	disc   *discovery
-	fogTex *ebiten.Image
+	// disc is the fog of war this map has had lifted: the coarse logic grid (a few
+	// KB), held by POINTER and handed straight back on a revisit. The high-res
+	// cleared TEXTURE is deliberately NOT stored: one full-map GPU image per visited
+	// map (34 MB for map0001 at native scale) ratcheted memory with every map in a
+	// run — on re-entry ensureFogTex re-hydrates a fresh texture from this grid,
+	// with an edge that starts a little coarser and refines as the ship flies.
+	disc *discovery
 }
 
 // bindMapState joins the live derived world to this map's entry in the store: the rock
@@ -65,9 +61,9 @@ func (g *Game) bindFog(s *mapState) {
 		return // procedural maps run without fog
 	}
 	if s.disc != nil && len(s.disc.seen) == len(g.disc.seen) {
-		g.disc, g.fogTex = s.disc, s.fogTex
+		g.disc = s.disc
 	}
-	s.disc, s.fogTex = g.disc, g.fogTex
+	s.disc = g.disc
 }
 
 // curMapState returns the saved state for the current map, creating it (and the

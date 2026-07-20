@@ -78,7 +78,6 @@ func cloneMapStates(m map[string]*mapState) map[string]*mapState {
 			resolved: maps.Clone(s.resolved),
 			dug:      slices.Clone(s.dug),
 			disc:     s.disc,
-			fogTex:   s.fogTex,
 		}
 	}
 	return out
@@ -137,6 +136,7 @@ func (g *Game) restoreCheckpoint() {
 	ticks := g.runTicks    // RTA speedrun clock: a death does not rewind it
 	startMap := g.startMap // the campaign origin is not part of a checkpoint; it outlives one
 	runLog := g.runLog     // the stages already summarized survive a death, like the RTA clock
+	g.releaseTransientImages()
 	*g = *newWithContent(g.content, g.player, cp.level, cp.mapDir, cp.simpleMap)
 	g.sfx = sfx
 	g.runTicks = ticks

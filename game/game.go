@@ -138,9 +138,12 @@ type Game struct {
 	discX, discY float64 // ship position at the last fog-discovery scan (skip re-scan when unmoved)
 	discTick     int     // frame counter for the stationary re-scan cadence
 
-	fogStampX, fogStampY float64   // ship position at the last fog-texture stamp (skip when unmoved)
-	fogStamped           bool      // at least one stamp has landed (position (0,0) is a valid start)
-	visSegs              []segment // scratch: walls within the visibility radius, reused per stamp
+	fogStampX, fogStampY float64     // ship position at the last fog-texture stamp (skip when unmoved)
+	fogStamped           bool        // at least one stamp has landed (position (0,0) is a valid start)
+	visSegs              []segment   // scratch: walls within the visibility radius, reused per stamp
+	visHits              []visHit    // scratch: ray hits, reused per stamp
+	visPoly              []vec2      // scratch: the returned polygon, reused per stamp
+	fogPath              vector.Path // scratch: the polygon stamped into fogTex, reused per stamp
 
 	boostFuel  float64 // afterburner fuel remaining (0..boostMax)
 	boosting   bool    // the booster is engaged this frame (raises the speed cap)
@@ -280,6 +283,14 @@ type Game struct {
 // the device-resolution screen scaled by the DPI, so UI text and shapes keep a
 // consistent physical size.
 func (g *Game) presentOverlay(screen *ebiten.Image, draw func(dst *ebiten.Image)) {
+	if g.deviceScale() == 1 {
+		// At 1× (the web profile, plain monitors) the overlay is exactly the screen:
+		// its callbacks only ADD content, so drawing straight onto the screen is the
+		// same composite minus a fullscreen buffer, its Clear and a fullscreen blit —
+		// per overlay, per frame (HUD, map, menu, credits).
+		draw(screen)
+		return
+	}
 	lw, lh := g.logicalSize()
 	if g.overlay == nil || g.overlay.Bounds().Dx() != lw || g.overlay.Bounds().Dy() != lh {
 		g.overlay = ebiten.NewImage(lw, lh)
@@ -598,6 +609,7 @@ func (g *Game) Update() error {
 			} else {
 				mapDir, mapName, simple := g.mapDir, g.mapName, g.simpleMap
 				sfx := g.sfx // the audio context is a process singleton: carry it over
+				g.releaseTransientImages()
 				*g = *newWithContent(g.content, g.player, g.level, mapDir, simple)
 				g.mapName, g.sfx = mapName, sfx // Shift+R (or no checkpoint): from scratch
 			}
@@ -1248,6 +1260,26 @@ func (g *Game) frameMargin() int {
 	radius := 0.5 * math.Hypot(float64(g.sw), float64(g.sh))
 	m := radius*turnSpeed*math.Pi/180 + maxSpeed*g.camPixelScale() + 8
 	return int(math.Ceil(m))
+}
+
+// releaseTransientImages hands the old world's GPU buffers back BEFORE a world
+// reset drops the struct. Ebiten frees an image's texture via a FINALIZER, so
+// without this every portal, restart and attract swap leaves several fullscreen
+// buffers waiting on some future GC — the memory ratchet behind the iOS tab
+// kills. No content is lost: everything here is redrawn from scratch (fogTex is
+// re-hydrated from the discovery grid on the next map entry). Idempotent, so
+// every reset route can call it without coordination.
+func (g *Game) releaseTransientImages() {
+	for _, img := range []*ebiten.Image{g.frame, g.fogMask, g.fogTex, g.overlay} {
+		if img != nil {
+			img.Deallocate()
+		}
+	}
+	g.frame, g.fogMask, g.fogTex, g.overlay = nil, nil, nil, nil
+	g.fogStamped = false // the cleared texture is gone; the next world must stamp anew
+	g.glow.Deallocate()
+	g.pglow.Deallocate()
+	g.flood.releaseImages()
 }
 
 // ensureFrame (re)allocates the padded frame buffer to match the device resolution

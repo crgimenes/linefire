@@ -798,6 +798,23 @@ func (f *floodmap) sync() {
 	}
 }
 
+// releaseImages returns the baked GPU images immediately (instead of waiting on
+// finalizers). Self-healing: sync() re-uploads them from pix on the next draw, so
+// even a floodmap still referenced by a saved screen just heals itself.
+func (f *floodmap) releaseImages() {
+	if f == nil {
+		return
+	}
+	if f.img != nil {
+		f.img.Deallocate()
+		f.img = nil
+	}
+	if f.dugImg != nil {
+		f.dugImg.Deallocate()
+		f.dugImg = nil
+	}
+}
+
 // gridGeoM maps the cell grid onto the world through the camera.
 func (f *floodmap) gridGeoM(cam ebiten.GeoM) ebiten.GeoM {
 	var m ebiten.GeoM

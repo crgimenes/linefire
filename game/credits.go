@@ -86,6 +86,10 @@ func (g *Game) enterCredits() {
 // same idiom enterMap/restart already use); only the audio context is shared, and each screen
 // re-derives its sound each frame.
 func (g *Game) enterCreditsReturning() {
+	// Release the transient buffers FIRST, so the snapshot copies nil pointers
+	// instead of images about to be deallocated — the restored screen then simply
+	// rebuilds them (and re-hydrates its fog from the discovery grid it keeps).
+	g.releaseTransientImages()
 	saved := *g // captured BEFORE enterCredits wipes the world
 	g.enterCredits()
 	g.screenReturn = &saved
@@ -110,6 +114,7 @@ func (g *Game) buildCreditsArena() {
 	name := creditsMapName
 	mapDir, startMap := g.mapDir, g.startMap
 	sfx := g.sfx
+	g.releaseTransientImages()
 	*g = *newWithContent(g.content, g.player, lvl, mapDir, false)
 	g.sfx, g.mapName, g.startMap = sfx, name, startMap
 
@@ -176,8 +181,9 @@ func (g *Game) stepCreditsMeta() bool {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) || (!g.creditsPlayable && touchJustTapped()) {
 		if g.screenReturn != nil {
-			sfx := g.sfx         // keep the live audio context (the snapshot shares it, but be explicit)
-			*g = *g.screenReturn // back to the screen the credits were opened from (title / game over / victory)
+			sfx := g.sfx               // keep the live audio context (the snapshot shares it, but be explicit)
+			g.releaseTransientImages() // the credits world is over; hand its buffers back now
+			*g = *g.screenReturn       // back to the screen the credits were opened from (title / game over / victory)
 			g.sfx = sfx
 			return true
 		}

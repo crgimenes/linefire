@@ -32,20 +32,19 @@ func (g *Game) enterRift() {
 	g.enterMap(lvl, fmt.Sprintf("@rift%d", g.digDepth), "from_rift", false)
 }
 
-// evictStaleProcMaps frees the fog textures of screens the run has left behind. Each map holds a
-// full-map fog texture (tens of MB of VRAM). During the campaign only procedural ("@") screens are
-// freed — authored maps are a bounded set the player can revisit through portals. But once in the
-// Rift (g.endless) the run can NEVER go back, so every map except the current one is released.
+// evictStaleProcMaps drops the remembered state of screens the run has left behind.
+// Map states are CPU-side now (the fog texture is no longer retained per map — it is
+// re-hydrated from the discovery grid on re-entry), so this is about not growing the
+// store without bound. During the campaign only procedural ("@") screens are dropped —
+// authored maps are a bounded set the player can revisit through portals. But once in
+// the Rift (g.endless) the run can NEVER go back, so every map except the current one goes.
 func (g *Game) evictStaleProcMaps(keep string) {
-	for name, s := range g.mapStates {
+	for name := range g.mapStates {
 		if name == keep {
 			continue
 		}
 		if !g.endless && !strings.HasPrefix(name, "@") {
 			continue // mid-campaign: keep authored maps (a revisit restores their fog/tunnels)
-		}
-		if s.fogTex != nil {
-			s.fogTex.Deallocate()
 		}
 		delete(g.mapStates, name)
 	}
