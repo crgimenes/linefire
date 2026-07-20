@@ -138,7 +138,7 @@ func TestEscortWaypointRoutesAroundWall(t *testing.T) {
 func TestAllyFiresOnlyAtEnemyInRange(t *testing.T) {
 	g := &Game{}
 	g.entities = []entity{{kind: kindEnemy, x: 100, y: 0, radius: 10}}
-	g.allies = []ally{{mode: modeEscort, x: 0, y: 0}}
+	g.allies = []ally{{mode: modeEscort, x: 0, y: 0, hunting: true}}
 
 	g.allyFire(&g.allies[0])
 	if len(g.projectiles) != 1 {
@@ -155,6 +155,83 @@ func TestAllyFiresOnlyAtEnemyInRange(t *testing.T) {
 	g.allyFire(&g.allies[0])
 	if len(g.projectiles) != 0 {
 		t.Fatal("an ally should not fire at an enemy beyond its range")
+	}
+}
+
+// TestEscortHoldsFireInFormation: an escort that is NOT engaged keeps formation —
+// no shot and no hull spin toward an enemy that is within its weapon range but
+// outside the hunt range (the old aim-anything-in-460 made it oscillate between
+// facing the formation and facing distant enemies).
+func TestEscortHoldsFireInFormation(t *testing.T) {
+	g := &Game{}
+	g.entities = []entity{{kind: kindEnemy, x: allyRange - 20, y: 0, radius: 10}}
+	g.allies = []ally{{mode: modeEscort, x: 0, y: 0, angle: 42}}
+
+	g.allyFire(&g.allies[0])
+	if len(g.projectiles) != 0 {
+		t.Fatal("an escort in formation should hold fire")
+	}
+	if g.allies[0].angle != 42 {
+		t.Fatalf("an escort in formation should keep its heading, got %.1f", g.allies[0].angle)
+	}
+}
+
+// TestEscortRidesFormationInShipHeading: settled on its slot, the escort rides it —
+// tracking the slot exactly and matching the SHIP's heading — while the ship moves
+// and turns. This is the fix for escorts glued to the slot but "pointing at the
+// player" and jittering through turns.
+func TestEscortRidesFormationInShipHeading(t *testing.T) {
+	g := &Game{}
+	g.addAlly(modeEscort)
+	for range 100 {
+		g.stepAllies() // settle into the slot
+	}
+	for i := range 60 {
+		g.angle += 3 // the ship turns while cruising, the case that jittered
+		g.x += 2
+		g.y += 1
+		g.stepAllies()
+		a := &g.allies[0]
+		sx, sy := g.escortSlot(0)
+		if math.Hypot(a.x-sx, a.y-sy) > 1e-6 {
+			t.Fatalf("step %d: a settled escort should ride its slot, got %.2f away", i, math.Hypot(a.x-sx, a.y-sy))
+		}
+		if a.angle != g.angle {
+			t.Fatalf("step %d: a settled escort should match the ship's heading %.1f, got %.1f", i, g.angle, a.angle)
+		}
+	}
+}
+
+// TestEscortHuntHysteresis: the hunt engages inside huntRange and only breaks past
+// huntDrop, so an enemy hovering at the border cannot flip the escort between
+// formation and hunt every frame.
+func TestEscortHuntHysteresis(t *testing.T) {
+	g := &Game{}
+	g.addAlly(modeEscort)
+	border := (huntRange + huntDrop) / 2 // between the engage and drop ranges
+	g.entities = []entity{{kind: kindEnemy, x: border, y: 0, radius: 8, hp: 1000}}
+
+	g.stepAllies()
+	if g.allies[0].hunting {
+		t.Fatal("an enemy beyond huntRange should not start a hunt")
+	}
+
+	g.entities[0].x = huntRange - 10 // steps inside: the hunt engages
+	g.stepAllies()
+	if !g.allies[0].hunting {
+		t.Fatal("an enemy inside huntRange should start the hunt")
+	}
+
+	g.entities[0].x = border // back to the border: the engaged hunt holds
+	g.stepAllies()
+	if !g.allies[0].hunting {
+		t.Fatal("an engaged hunt should hold until the enemy passes huntDrop")
+	}
+
+	g.entities[0].x = huntDrop + 30 // past the drop range: back to formation
+	g.stepAllies()
+	if g.allies[0].hunting {
+		t.Fatal("an enemy past huntDrop should end the hunt")
 	}
 }
 

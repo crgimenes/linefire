@@ -30,10 +30,20 @@ import (
 const (
 	touchDeadzonePx   = 14.0 // logical px of deflection before a stick registers
 	turretThresholdPx = 40.0 // deflection that flips the right thumb from nose fire to turret aim
-	touchAimReachPx   = 220. // how far from the ship the synthetic turret "cursor" sits
-	stickRingPx       = 46.0 // stick base ring radius (drawn), logical px
-	stickKnobPx       = 14.0 // stick knob radius (drawn), logical px
-	pauseSpotPx       = 52.0 // side of the square pause hotspot in the top-left corner, logical px
+
+	// Angular response of the steering stick. The deflection is fixed in SCREEN
+	// space while the nose is always screen-up, so any angular misalignment is a
+	// standing turn command — at a flat full rate, holding the thumb dead-vertical
+	// was the only way to fly straight (playtest: "any touch spins the ship").
+	// Instead: inside the angular deadzone the ship flies straight (thrust only),
+	// and above it the turn rate ramps up, reaching full turnSpeed only past the
+	// ramp — small thumb errors drift gently, a hard sideways push still whips.
+	touchTurnDeadDeg = 8.0  // |heading error| under this: no turn, just thrust
+	touchTurnRampDeg = 40.0 // full turn rate only past this much heading error
+	touchAimReachPx  = 220. // how far from the ship the synthetic turret "cursor" sits
+	stickRingPx      = 46.0 // stick base ring radius (drawn), logical px
+	stickKnobPx      = 14.0 // stick knob radius (drawn), logical px
+	pauseSpotPx      = 52.0 // side of the square pause hotspot in the top-left corner, logical px
 )
 
 // thumb is one finger riding one half of the screen.
@@ -66,6 +76,21 @@ var touchPad touchCtl
 // (the ship's nose) is zero, right is +90. Pure, so the mapping is testable.
 func steerDelta(dx, dy float64) float64 {
 	return normDeg(math.Atan2(dy, dx)*180/math.Pi + 90)
+}
+
+// touchTurnStep maps a heading error (degrees, from steerDelta) to this frame's
+// signed turn, applying the angular deadzone and the proportional ramp up to
+// turnSpeed. Pure, so the response curve is testable.
+func touchTurnStep(delta float64) float64 {
+	mag := math.Abs(delta)
+	if mag <= touchTurnDeadDeg {
+		return 0
+	}
+	frac := (mag - touchTurnDeadDeg) / (touchTurnRampDeg - touchTurnDeadDeg)
+	if frac > 1 {
+		frac = 1
+	}
+	return math.Copysign(turnSpeed*frac, delta)
 }
 
 // claimThumb assigns a fresh touch to the half its ORIGIN is in (crossing the middle
@@ -157,7 +182,7 @@ func (g *Game) applyTouchControls() bool {
 	if tc.left.active {
 		dx, dy := tc.left.deflection()
 		if math.Hypot(dx, dy) > touchDeadzonePx*g.dpr {
-			g.angle = turnToward(g.angle, g.angle+steerDelta(dx, dy), turnSpeed)
+			g.angle += touchTurnStep(steerDelta(dx, dy))
 			fx, fy, _, _ := g.headingDirs()
 			g.vx += fx * thrust
 			g.vy += fy * thrust

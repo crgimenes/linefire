@@ -27,6 +27,35 @@ func TestSteerDelta(t *testing.T) {
 	}
 }
 
+// TestTouchTurnStep: the steering response curve — dead inside the angular
+// deadzone (straight flight tolerates thumb error), proportional above it, and
+// capped at the full keyboard turn rate for hard pushes. The flat full-rate
+// response made straight flight nearly impossible: any misalignment turned the
+// ship at 3°/frame indefinitely.
+func TestTouchTurnStep(t *testing.T) {
+	cases := []struct {
+		delta, want float64
+	}{
+		{0, 0},                        // dead ahead: fly straight
+		{touchTurnDeadDeg - 1, 0},     // inside the deadzone: still straight
+		{-(touchTurnDeadDeg - 1), 0},  // symmetric
+		{touchTurnRampDeg, turnSpeed}, // ramp end: full rate
+		{90, turnSpeed},               // hard push: capped at full rate
+		{-90, -turnSpeed},             // capped, signed
+	}
+	for _, c := range cases {
+		if got := touchTurnStep(c.delta); math.Abs(got-c.want) > 1e-9 {
+			t.Fatalf("touchTurnStep(%v) = %v, want %v", c.delta, got, c.want)
+		}
+	}
+	// Midway up the ramp the response is proportional: more error, more turn,
+	// but strictly under the cap.
+	mid := touchTurnStep((touchTurnDeadDeg + touchTurnRampDeg) / 2)
+	if mid <= 0 || mid >= turnSpeed {
+		t.Fatalf("mid-ramp response should be a partial turn, got %v", mid)
+	}
+}
+
 // TestClaimThumb: a fresh touch joins the half its ORIGIN is in, an occupied half
 // refuses a second finger, and a new right touch always starts in nose-fire mode.
 func TestClaimThumb(t *testing.T) {
