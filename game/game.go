@@ -187,7 +187,6 @@ type Game struct {
 	creditsWanderY  float64  // autopilot roam target (world y)
 	creditsWanderCD int      // frames until the autopilot picks a new roam target
 	creditsRegenCD  int      // frames until the attract backdrop is regenerated (a fresh map)
-	creditsTrack    string   // attract soundtrack now on air; survives a backdrop swap, swapped only on its own end
 	attractRecords  []string // the HI score + best times, shown on the title's records page (rebuilt per backdrop)
 	screenReturn    *Game    // the non-playable screen the credits were opened from, so Esc backs out to it (nil = none)
 

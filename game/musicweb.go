@@ -12,6 +12,9 @@ type webTrack struct{}
 
 func newWebTrack(string, []byte, bool, float64) *webTrack { return nil }
 
+func webMusicBlocked() bool  { return false }
+func consumeWebUnlock() bool { return false }
+
 func (t *webTrack) done() bool        { return false }
 func (t *webTrack) setVolume(float64) {}
 func (t *webTrack) stop()             {}

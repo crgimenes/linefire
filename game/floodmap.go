@@ -454,6 +454,25 @@ func (f *floodmap) rockAt(x, y float64) bool {
 	return i < 0 || !f.interior[i]
 }
 
+// rayToRock walks from (x,y) along the unit direction (dx,dy) until it enters
+// rock or reaches maxDist, returning the distance travelled. Half-cell steps,
+// the same stride collision's rockOnSegment trusts not to skip a wall. This is
+// the fog's sight ray: unlike the authored segments it respects dug tunnels.
+func (f *floodmap) rayToRock(x, y, dx, dy, maxDist float64) float64 {
+	step := f.cell * 0.5
+	sx, sy := dx*step, dy*step
+	n := int(maxDist / step)
+	px, py := x, y
+	for i := range n {
+		px += sx
+		py += sy
+		if f.rockAt(px, py) {
+			return float64(i+1) * step
+		}
+	}
+	return maxDist
+}
+
 // dugAt reports whether (x,y) sits in rock the player blasted open — a tunnel or a
 // crater, as opposed to an authored corridor.
 func (f *floodmap) dugAt(x, y float64) bool {
@@ -734,6 +753,10 @@ func (g *Game) refreshFlood() {
 		return
 	}
 	if f.dirty {
+		// The rock face moved, so the sight lines did too: force the next fog stamp
+		// even if the ship holds still — a hole blasted through a wall must open a
+		// cone through it on the spot, not on the next move.
+		g.fogStamped = false
 		x0, y0, x1, y1 := f.dirtyMinX, f.dirtyMinY, f.dirtyMaxX, f.dirtyMaxY
 		f.pruneSlivers(x0, y0, x1, y1)  // erase chips of rock that would snag the ship
 		f.rebuildWindow(x0, y0, x1, y1) // clears dirty; clearance is only valid after this

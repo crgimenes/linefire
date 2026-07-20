@@ -27,7 +27,7 @@ func (g *Game) enterRift() {
 	// stays winnable deep in, a long tail to rack up score on.
 	lvl := procgen.GenRiftRoom(seed, g.digDepth/2, riftMapName)
 	lvl.Title = fmt.Sprintf("THE RIFT — depth %d", g.digDepth)
-	lvl.Music = g.randomTrack() // generated screens carry no authored theme
+	// Themeless on purpose: the song on the air plays on; the jukebox rotates it.
 	g.logf(">>> THE RIFT  depth %d — no way back <<<", g.digDepth)
 	g.enterMap(lvl, fmt.Sprintf("@rift%d", g.digDepth), "from_rift", false)
 }

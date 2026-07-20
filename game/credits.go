@@ -100,8 +100,7 @@ const creditsRegenFrames = 1200
 // restarting the credits scroll or dropping the title.
 func (g *Game) buildCreditsArena() {
 	scroll, konami, playable, title := g.creditsScroll, g.konamiN, g.creditsPlayable, g.titleMode
-	track := g.creditsTrack // carried across the swap: the song plays out, the map does not
-	ret := g.screenReturn   // the remembered back-out screen must survive the periodic regen
+	ret := g.screenReturn // the remembered back-out screen must survive the periodic regen
 
 	// A freshly generated cave (randIntN is auto-seeded, so it varies per launch too); the
 	// empty-target exit portal is inert while the demo runs, so it is just decoration. The arena
@@ -135,15 +134,8 @@ func (g *Game) buildCreditsArena() {
 	g.creditsRegenCD = creditsRegenFrames
 	g.attractRecords = g.buildAttractRecords() // refresh the records page (New wiped it); reflects the latest run
 
-	// Restore (or, on first entry, pick) the attract track and ready it, so it starts without a
-	// hitch and keeps playing across this and every later backdrop swap.
-	g.creditsTrack = track
-	if g.creditsTrack == "" {
-		g.creditsTrack = g.nextCreditsTrack("")
-	}
-	if g.sfx != nil && g.creditsTrack != "" {
-		g.sfx.prewarmTheme(g.creditsTrack, 0)
-	}
+	// The soundtrack needs no hand-off here: the jukebox lives on the sound bank,
+	// which every world reset carries, so the song simply plays on (stepJukebox).
 
 	g.pickWanderTarget() // seed the autopilot's first roam target
 }
@@ -167,6 +159,9 @@ func (g *Game) stepCreditsMeta() bool {
 	if g.creditsRegenCD <= 0 {
 		g.buildCreditsArena() // swap in a fresh backdrop (keeps the scroll/title/konami)
 		return false          // resume the meta next frame on the new arena
+	}
+	if consumeWebUnlock() {
+		return false // web: this gesture just woke the audio after a silent reload — that was its job
 	}
 	if g.titleMode {
 		if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) || touchJustTapped() {

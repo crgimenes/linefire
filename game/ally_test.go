@@ -51,10 +51,36 @@ func TestEscortRegroupsWhenNoEnemy(t *testing.T) {
 		g.stepAllies()
 	}
 	a := &g.allies[0]
-	// idx 0: rank 1, side +1, back along -x, lateral along +y.
+	// idx 0: rank 1, side +1, back along -x, lateral along +y. The lazy formation
+	// parks NEAR the slot (within the settle radius), not exactly on it.
 	wantX, wantY := -escortBack, escortSpacing
-	if math.Hypot(a.x-wantX, a.y-wantY) > 0.5 {
-		t.Fatalf("with no enemy an escort should settle in its slot (%.0f,%.0f), got (%.2f,%.2f)", wantX, wantY, a.x, a.y)
+	if d := math.Hypot(a.x-wantX, a.y-wantY); d > formationSettleDist+1 {
+		t.Fatalf("with no enemy an escort should park near its slot (%.0f,%.0f), got (%.2f,%.2f) — %.1f away", wantX, wantY, a.x, a.y, d)
+	}
+	if !a.resting {
+		t.Fatal("a settled escort should be parked (resting)")
+	}
+}
+
+// TestEscortRestsWhileShipJitters is the fix for the trembling wingman: a PARKED
+// escort does not move at all while the ship shuffles around in place — the slot's
+// small drifts are ignored until they add up past the chase radius.
+func TestEscortRestsWhileShipJitters(t *testing.T) {
+	g := &Game{}
+	g.addAlly(modeEscort)
+	for range 200 {
+		g.stepAllies() // park it
+	}
+	a := &g.allies[0]
+	px, py := a.x, a.y
+	for i := range 240 {
+		g.x = 10 * math.Sin(float64(i)*0.3)     // the ship shuffles and wobbles in place;
+		g.y = 6 * math.Cos(float64(i)*0.4)      // the slot drifts with it, well under the
+		g.angle = 10 * math.Sin(float64(i)*0.2) // chase radius — the trembling case
+		g.stepAllies()
+		if a.x != px || a.y != py {
+			t.Fatalf("step %d: a parked escort must hold still while the ship jitters (moved %.2f)", i, math.Hypot(a.x-px, a.y-py))
+		}
 	}
 }
 
@@ -92,8 +118,8 @@ func TestEscortIgnoresFarEnemy(t *testing.T) {
 	}
 	a := &g.allies[0]
 	sx, sy := g.escortSlot(0)
-	if math.Hypot(a.x-sx, a.y-sy) > 1.0 {
-		t.Fatalf("an escort should ignore a far enemy and regroup at its slot, got (%.1f,%.1f)", a.x, a.y)
+	if d := math.Hypot(a.x-sx, a.y-sy); d > formationSettleDist+1 {
+		t.Fatalf("an escort should ignore a far enemy and park near its slot, got (%.1f,%.1f) — %.1f away", a.x, a.y, d)
 	}
 }
 
@@ -176,29 +202,50 @@ func TestEscortHoldsFireInFormation(t *testing.T) {
 	}
 }
 
-// TestEscortRidesFormationInShipHeading: settled on its slot, the escort rides it —
-// tracking the slot exactly and matching the SHIP's heading — while the ship moves
-// and turns. This is the fix for escorts glued to the slot but "pointing at the
-// player" and jittering through turns.
-func TestEscortRidesFormationInShipHeading(t *testing.T) {
+// TestEscortSettlesIntoFormationHeading: a parked escort turns (slowly) into the
+// SHIP's heading — the hull settles into formation without the position ever
+// twitching after the slot.
+func TestEscortSettlesIntoFormationHeading(t *testing.T) {
+	g := &Game{}
+	g.angle = 30
+	g.addAlly(modeEscort)
+	g.allies[0].angle = 200 // deliberately misaligned: it must turn into formation
+	for range 400 {
+		g.stepAllies()
+	}
+	a := &g.allies[0]
+	if !a.resting {
+		t.Fatal("the escort should have parked")
+	}
+	if d := math.Abs(normDeg(a.angle - g.angle)); d > 1e-6 {
+		t.Fatalf("a parked escort should align with the ship's heading %.1f, got %.1f", g.angle, a.angle)
+	}
+}
+
+// TestEscortTrailsFastShip: the formation is a PURSUIT, not an attachment — a ship
+// outrunning huntSpeed leaves the escort trailing behind (the chase the squad's
+// feel comes from), and once the ship stops the escort closes back onto its slot.
+func TestEscortTrailsFastShip(t *testing.T) {
 	g := &Game{}
 	g.addAlly(modeEscort)
-	for range 100 {
-		g.stepAllies() // settle into the slot
+	for range 200 {
+		g.stepAllies() // settle first
 	}
-	for i := range 60 {
-		g.angle += 3 // the ship turns while cruising, the case that jittered
-		g.x += 2
-		g.y += 1
+	for range 60 {
+		g.x += huntSpeed + 2 // the ship outruns the escort (boost)
 		g.stepAllies()
-		a := &g.allies[0]
-		sx, sy := g.escortSlot(0)
-		if math.Hypot(a.x-sx, a.y-sy) > 1e-6 {
-			t.Fatalf("step %d: a settled escort should ride its slot, got %.2f away", i, math.Hypot(a.x-sx, a.y-sy))
-		}
-		if a.angle != g.angle {
-			t.Fatalf("step %d: a settled escort should match the ship's heading %.1f, got %.1f", i, g.angle, a.angle)
-		}
+	}
+	sx, sy := g.escortSlot(0)
+	lag := math.Hypot(g.allies[0].x-sx, g.allies[0].y-sy)
+	if lag <= formationChaseDist {
+		t.Fatalf("a boosting ship should leave the escort trailing, lag only %.1f", lag)
+	}
+	for range 300 {
+		g.stepAllies() // ship stopped: the escort re-forms
+	}
+	sx, sy = g.escortSlot(0)
+	if d := math.Hypot(g.allies[0].x-sx, g.allies[0].y-sy); d > formationSettleDist+1 {
+		t.Fatalf("after the ship stops the escort should park near its slot again, still %.1f away", d)
 	}
 }
 

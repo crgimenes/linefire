@@ -78,18 +78,20 @@ func resolveEvent(a *asset.Asset, event string) (soundReq, bool) {
 // (lazily rendered, keyed by base+seed), a per-sound throttle and round-robin
 // cursor, and the live players (pruned once finished).
 type soundBank struct {
-	ctx      *audio.Context
-	rendered map[string][][]byte
-	cooldown map[string]int
-	next     map[string]int
-	players  []*audio.Player
-	loops    map[string]*audio.Player // running continuous sounds, by loop name
-	loopVol  map[string]float64       // each loop's own relative volume (for live master changes)
-	music    *audio.Player            // the looping soundtrack, one track at a time
-	webMusic *webTrack                // web only: MP3 track on an HTMLAudioElement (nil natively)
-	musicKey string                   // cache key of the track on air
-	files    map[string][]byte        // raw music files (mp3), by path
-	content  fs.FS                    // where music files live (embedded bundle or a directory)
+	ctx       *audio.Context
+	rendered  map[string][][]byte
+	cooldown  map[string]int
+	next      map[string]int
+	players   []*audio.Player
+	loops     map[string]*audio.Player // running continuous sounds, by loop name
+	loopVol   map[string]float64       // each loop's own relative volume (for live master changes)
+	music     *audio.Player            // the looping soundtrack, one track at a time
+	webMusic  *webTrack                // web only: MP3 track on an HTMLAudioElement (nil natively)
+	musicKey  string                   // cache key of the track on air
+	musicName string                   // theme name on air (file path or gion mood; "" = none)
+	jukeTrack string                   // the jukebox's current random pick (see stepJukebox)
+	files     map[string][]byte        // raw music files (mp3), by path
+	content   fs.FS                    // where music files live (embedded bundle or a directory)
 
 	// The player's audio settings (persisted via the config package). master
 	// scales every play, loop and track; muted (F6 or the pause menu) silences
