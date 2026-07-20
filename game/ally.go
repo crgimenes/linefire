@@ -41,9 +41,17 @@ const (
 	escortBack       = 30.0 // trailing world units per regroup rank
 
 	huntRange    = 320.0 // only hunt enemies within this of the SHIP — its job is to guard, not roam
+	huntDrop     = 380.0 // an engaged hunt only breaks past this (hysteresis: no formation<->hunt flicker at the border)
 	huntStandoff = 120.0 // distance an escort holds from its prey while shooting
 	huntLeash    = 280.0 // hard cap on roam from the ship, so it never strays far from its charge
 	huntSpeed    = 4.0   // world units per frame an escort moves while hunting or regrouping
+
+	// formationRideDist: within this of its slot the escort RIDES it — position locked
+	// to the slot, hull matching the SHIP's heading — instead of steering at the point
+	// it already sits on. The slot moves with every turn (a rank-2 slot sweeps ~5 wu
+	// per turning frame, plus the ship's speed), so it must exceed the slot's own
+	// per-frame travel or the ride breaks into chase jitter every frame.
+	formationRideDist = 16.0
 
 	escortScale = 0.62 // player-hull scale for an escort
 	droneScale  = 0.46 // player-hull scale for a drone
@@ -52,11 +60,12 @@ const (
 // ally is a friendly companion (escort or drone). Position is world space; angle is
 // degrees, matching the ship convention (0 = +x, the hull mesh points up).
 type ally struct {
-	mode   allyMode
-	x, y   float64
-	angle  float64
-	fireCD int
-	hits   int // enemy shots it can still take before it is destroyed
+	mode    allyMode
+	x, y    float64
+	angle   float64
+	fireCD  int
+	hits    int  // enemy shots it can still take before it is destroyed
+	hunting bool // escort only: engaged with a nearby enemy (breaks the formation)
 
 	// A* navigation state for an aggressive escort, mirroring the enemy pursuit fields.
 	path     []vec2
@@ -180,22 +189,43 @@ func (g *Game) escortSlot(idx int) (float64, float64) {
 	return g.x - fx*back - fy*lat, g.y - fy*back + fx*lat
 }
 
-// stepEscort flies an AGGRESSIVE escort idx: it guards the ship by darting at the nearest
-// enemy within its short patrol range, routing around walls with A* (like the enemies do),
-// holding a shooting standoff once it has a clear shot, and regrouping into its trailing
-// slot when there is nothing near to fight. It never chases across the map. allyFire aims
-// and shoots — here we only move it.
+// stepEscort flies an AGGRESSIVE escort idx: it flies FORMATION on its trailing slot
+// (riding it in the ship's heading), BREAKS formation to dart at the nearest enemy
+// within the ship's patrol range — routing around walls with A*, holding a shooting
+// standoff once it has a clear shot — and re-forms when the fight is over. It never
+// chases across the map. allyFire aims and shoots — here we only move it.
 func (g *Game) stepEscort(a *ally, idx, n int) {
 	_ = n
-	gx, gy := g.escortSlot(idx) // regroup here when idle
-	ex, ey, hunting := g.nearestEnemyFrom(g.x, g.y, huntRange)
+	// Hunt with hysteresis: engage inside huntRange, and once engaged only break
+	// past huntDrop — a flat threshold flipped formation<->hunt every frame while
+	// an enemy hovered at the border (the oscillation seen in playtest).
+	rng := huntRange
+	if a.hunting {
+		rng = huntDrop
+	}
+	ex, ey, hunting := g.nearestEnemyFrom(g.x, g.y, rng)
+	a.hunting = hunting
 	if hunting {
 		// At the standoff with a clear line: hold and let allyFire do the shooting.
 		if math.Hypot(ex-a.x, ey-a.y) <= huntStandoff && g.clearPath(a.x, a.y, ex, ey, 0) {
 			a.angle = math.Atan2(ey-a.y, ex-a.x) * 180 / math.Pi
 			return
 		}
-		gx, gy = ex, ey
+		wx, wy := g.allyWaypoint(a, ex, ey)
+		g.moveAllyToward(a, wx, wy)
+		return
+	}
+
+	// Nothing to fight: formation. Near the slot the escort rides it rigidly in the
+	// SHIP's heading. Steering at the slot every frame instead left the escort glued
+	// on top of it, re-facing wherever the moving slot dragged it — "always pointing
+	// at the player", jittering through every turn.
+	gx, gy := g.escortSlot(idx)
+	if math.Hypot(gx-a.x, gy-a.y) <= formationRideDist {
+		a.x, a.y = gx, gy
+		a.angle = g.angle
+		a.path, a.pathStep = nil, 0 // the ride needs no route; drop any stale one
+		return
 	}
 	wx, wy := g.allyWaypoint(a, gx, gy)
 	g.moveAllyToward(a, wx, wy)
@@ -269,6 +299,9 @@ func (g *Game) stepOrbit(a *ally, idx, n int) {
 func (g *Game) allyFire(a *ally) {
 	if a.fireCD > 0 {
 		a.fireCD--
+	}
+	if a.mode == modeEscort && !a.hunting {
+		return // in formation: hold the shape and the heading until enemies come near
 	}
 	ex, ey, ok := g.nearestEnemyFrom(a.x, a.y, allyRange)
 	if !ok {

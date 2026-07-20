@@ -144,16 +144,31 @@ func buildFloodmap(segs []segment, startX, startY float64, b bounds) *floodmap {
 var neigh4 = [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
 
 // markSolidCells flags every cell whose center is within fillMargin of a wall.
+// Per SEGMENT, only the cells inside its fillMargin-dilated bounding box are
+// tested (any cell within fillMargin of the segment lies inside that box, so the
+// result is identical to testing every cell) — the all-cells × all-walls version
+// was ~90% of a whole map build, the stall that hitched the audio on the attract
+// backdrop swap.
 func markSolidCells(segs []segment, cols, rows int, ox, oy float64) []bool {
 	solid := make([]bool, cols*rows)
 	m2 := fillMargin * fillMargin
-	for cy := range rows {
-		for cx := range cols {
-			px, py := ox+(float64(cx)+0.5)*fillCell, oy+(float64(cy)+0.5)*fillCell
-			for _, s := range segs {
+	for _, s := range segs {
+		minX := math.Min(s.ax, s.bx) - fillMargin
+		maxX := math.Max(s.ax, s.bx) + fillMargin
+		minY := math.Min(s.ay, s.by) - fillMargin
+		maxY := math.Max(s.ay, s.by) + fillMargin
+		cx0 := max(int(math.Floor((minX-ox)/fillCell-0.5))-1, 0)
+		cx1 := min(int(math.Ceil((maxX-ox)/fillCell-0.5))+1, cols-1)
+		cy0 := max(int(math.Floor((minY-oy)/fillCell-0.5))-1, 0)
+		cy1 := min(int(math.Ceil((maxY-oy)/fillCell-0.5))+1, rows-1)
+		for cy := cy0; cy <= cy1; cy++ {
+			for cx := cx0; cx <= cx1; cx++ {
+				if solid[cy*cols+cx] {
+					continue
+				}
+				px, py := ox+(float64(cx)+0.5)*fillCell, oy+(float64(cy)+0.5)*fillCell
 				if distPointSegmentSq(px, py, s.ax, s.ay, s.bx, s.by) <= m2 {
 					solid[cy*cols+cx] = true
-					break
 				}
 			}
 		}
