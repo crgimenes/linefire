@@ -41,10 +41,10 @@ const (
 	distCap  = glowRange + fillCell
 
 	// Freshly cut rock glows hot and cools back to the wall colour. The band is the
-	// depth of rock a bite leaves scorched; the decay is per frame.
+	// depth of rock a bite leaves scorched; the decay is per frame (the uint8 age's
+	// floor rounding brings it to exactly 0 in ~2.5s).
 	hotBand  = 10.0  // world units of rock face heated by a bite
 	hotDecay = 0.965 // per-frame cooling: ~2.5s from white-hot to cold
-	hotEps   = 0.02  // below this a cell is cold and leaves the hot list
 )
 
 var (
@@ -77,18 +77,22 @@ type floodmap struct {
 	originX, originY float64   // world coordinate of cell (0,0); negative due to padding
 	interior         []bool    // reachable free cells (authored corridors + everything dug)
 	dug              []bool    // cells the player blasted out of the rock
-	dist             []float32 // rock cell -> world distance to the nearest interior cell (the GLOW)
 	clear            []float32 // any cell -> world distance to the nearest rock cell (COLLISION clearance; 0 inside rock)
 	pix              []byte    // RGBA backing for img: glow intensity per cell
-	dugPix           []byte    // RGBA backing for dugImg: opaque black where dug
 	img, dugImg      *ebiten.Image
 	dirty            bool // a carve happened: the field and its images need a rebuild
 	holes            int  // carves landed (debug telemetry)
 
-	// hotAge is how freshly cut each rock cell is (1 = just melted, 0 = cold). It is a
-	// pure RENDER channel — nothing in collision or nav reads it. hotCells is the short
-	// list of cells still cooling, so a frame only touches those instead of the grid.
-	hotAge   []float32
+	// NOTE the two derived channels this struct does NOT store (each was 4 bytes
+	// per cell over the padded grid): the glow DISTANCE lives only in the chamfer
+	// scratch during a (re)bake — the baked pix alpha keeps the intensity, and
+	// cooling re-derives it from there; and dugImg's PIXELS are generated from
+	// the dug bitset on demand at upload time.
+
+	// hotAge is how freshly cut each rock cell is (255 = just melted, 0 = cold). It is
+	// a pure RENDER channel — nothing in collision or nav reads it. hotCells is the
+	// short list of cells still cooling, so a frame only touches those, not the grid.
+	hotAge   []uint8
 	hotCells []int32
 
 	// Reused scratch for the windowed rebuild, so a dig allocates nothing.
@@ -129,10 +133,9 @@ func buildFloodmap(segs []segment, startX, startY float64, b bounds) *floodmap {
 	f := &floodmap{
 		cols: cols, rows: rows, cell: fillCell, originX: ox, originY: oy,
 		dug:    make([]bool, n),
-		dist:   make([]float32, n),
 		clear:  make([]float32, n),
-		hotAge: make([]float32, n),
-		pix:    make([]byte, n*4), dugPix: make([]byte, n*4),
+		hotAge: make([]uint8, n),
+		pix:    make([]byte, n*4),
 	}
 
 	solid := markSolidCells(segs, cols, rows, ox, oy)
@@ -217,15 +220,16 @@ func floodFrom(solid []bool, cols, rows, seed int) []bool {
 // rebuild recomputes both distance fields and both images over the WHOLE grid. Used
 // once at load; a dig uses rebuildWindow instead.
 func (f *floodmap) rebuild() {
-	f.chamferInto(f.dist, true, distCap)    // seeds = interior -> how deep into the rock we are (glow)
-	f.chamferInto(f.clear, false, clearCap) // seeds = rock -> how much room the ship has (collision)
-	f.bakeAll()
+	f.scratchD = growF32(f.scratchD, f.cols*f.rows)
+	f.chamferInto(f.scratchD, true, distCap) // seeds = interior -> how deep into the rock we are (glow)
+	f.chamferInto(f.clear, false, clearCap)  // seeds = rock -> how much room the ship has (collision)
+	for i := range f.interior {
+		f.bakeCell(i, f.scratchD[i])
+	}
 	if f.img != nil {
 		f.img.WritePixels(f.pix)
 	}
-	if f.dugImg != nil {
-		f.dugImg.WritePixels(f.dugPix)
-	}
+	f.uploadDugAll()
 	f.dirty = false
 }
 
@@ -267,9 +271,8 @@ func (f *floodmap) rebuildWindow(x0, y0, x1, y1 float64) {
 		for cx := wx0; cx <= wx1; cx++ {
 			li := (cy-cy0)*cw + (cx - cx0)
 			gi := cy*f.cols + cx
-			f.dist[gi] = f.scratchD[li]
 			f.clear[gi] = f.scratchC[li]
-			f.bakeCell(gi)
+			f.bakeCell(gi, f.scratchD[li])
 		}
 	}
 	f.uploadRect(wx0, wy0, wx1, wy1)
@@ -353,7 +356,9 @@ func scaleClamp(d []float32, k, capV float32) {
 	}
 }
 
-// uploadRect re-uploads only the changed texels of both images.
+// uploadRect re-uploads only the changed texels of both images. The dug texels
+// are GENERATED from the dug bitset here — a full RGBA backing for a mask that is
+// just "opaque black where dug" was 4 bytes per cell of dead weight.
 func (f *floodmap) uploadRect(x0, y0, x1, y1 int) {
 	if f.img == nil || f.dugImg == nil {
 		return // not synced to the GPU yet; the next sync uploads everything
@@ -365,11 +370,36 @@ func (f *floodmap) uploadRect(x0, y0, x1, y1 int) {
 		src := ((y0+ly)*f.cols + x0) * 4
 		dst := ly * w * 4
 		copy(f.scratchPix[dst:dst+w*4], f.pix[src:src+w*4])
-		copy(f.scratchDug[dst:dst+w*4], f.dugPix[src:src+w*4])
+		for lx := range w {
+			f.writeDugTexel(f.scratchDug, dst+lx*4, (y0+ly)*f.cols+(x0+lx))
+		}
 	}
 	r := image.Rect(x0, y0, x1+1, y1+1)
 	f.img.SubImage(r).(*ebiten.Image).WritePixels(f.scratchPix)
 	f.dugImg.SubImage(r).(*ebiten.Image).WritePixels(f.scratchDug)
+}
+
+// writeDugTexel writes cell i's dug-mask texel at offset o of buf: opaque
+// background colour where the player blasted the rock, transparent elsewhere.
+func (f *floodmap) writeDugTexel(buf []byte, o, i int) {
+	if f.dug[i] {
+		buf[o], buf[o+1], buf[o+2], buf[o+3] = colorBg.R, colorBg.G, colorBg.B, 0xff
+		return
+	}
+	buf[o], buf[o+1], buf[o+2], buf[o+3] = 0, 0, 0, 0
+}
+
+// uploadDugAll regenerates and uploads the whole dug mask (rebuild/sync time).
+func (f *floodmap) uploadDugAll() {
+	if f.dugImg == nil {
+		return
+	}
+	n := f.cols * f.rows
+	f.scratchDug = growBytes(f.scratchDug, n*4)
+	for i := range n {
+		f.writeDugTexel(f.scratchDug, i*4, i)
+	}
+	f.dugImg.WritePixels(f.scratchDug[:n*4])
 }
 
 func growBytes(s []byte, n int) []byte {
@@ -396,42 +426,46 @@ func (f *floodmap) chamferInto(d []float32, seedInterior bool, capV float32) {
 	scaleClamp(d, float32(f.cell/3), capV)
 }
 
-// bakeCell writes one cell's texels: the silhouette glow (brightest at the rock face,
-// fading to nothing over glowRange) and the black mask wherever the player has blasted
-// the rock away.
-func (f *floodmap) bakeCell(i int) {
+// bakeCell writes one cell's glow texels from the given glow distance: brightest
+// at the rock face, fading to nothing over glowRange, tinted by how hot the cell
+// still is. The distance is NOT stored anywhere — the baked alpha carries the
+// intensity (see rebakeHot).
+func (f *floodmap) bakeCell(i int, dist float32) {
 	o := i * 4
 	if f.interior[i] {
 		f.pix[o], f.pix[o+1], f.pix[o+2], f.pix[o+3] = 0, 0, 0, 0
-	} else {
-		v := (glowRange - float64(f.dist[i])) / glowRange
-		if v < 0 {
-			v = 0
-		} else if v > 1 {
-			v = 1
-		}
-		// The COLOUR is baked per cell (premultiplied by the glow intensity) rather
-		// than applied as one ColorScale at draw time — that is the whole reason a
-		// freshly cut face can run hot while the rock beside it stays cold.
-		h := float64(f.hotAge[i])
-		f.pix[o] = uint8(v * lerp(float64(floodGlowColor.R), float64(hotRockColor.R), h))
-		f.pix[o+1] = uint8(v * lerp(float64(floodGlowColor.G), float64(hotRockColor.G), h))
-		f.pix[o+2] = uint8(v * lerp(float64(floodGlowColor.B), float64(hotRockColor.B), h))
-		f.pix[o+3] = uint8(v * 255)
-	}
-	if f.dug[i] {
-		f.dugPix[o], f.dugPix[o+1], f.dugPix[o+2] = colorBg.R, colorBg.G, colorBg.B
-		f.dugPix[o+3] = 0xff
 		return
 	}
-	f.dugPix[o], f.dugPix[o+1], f.dugPix[o+2], f.dugPix[o+3] = 0, 0, 0, 0
+	v := (glowRange - float64(dist)) / glowRange
+	if v < 0 {
+		v = 0
+	} else if v > 1 {
+		v = 1
+	}
+	f.bakeGlowTexel(o, v)
 }
 
-// bakeAll re-bakes every texel (load time).
-func (f *floodmap) bakeAll() {
-	for i := range f.interior {
-		f.bakeCell(i)
+// rebakeHot re-tints a cooling cell. Its glow distance is gone with the rebuild
+// scratch, but the baked ALPHA is exactly the intensity that distance produced,
+// so cooling — which never moves the rock, only fades the tint — reads it back.
+func (f *floodmap) rebakeHot(i int) {
+	o := i * 4
+	if f.interior[i] {
+		return // opened by a later carve; the rebuild already blanked it
 	}
+	f.bakeGlowTexel(o, float64(f.pix[o+3])/255)
+}
+
+// bakeGlowTexel writes the premultiplied glow colour for intensity v at pixel
+// offset o. The COLOUR is baked per cell rather than applied as one ColorScale at
+// draw time — that is the whole reason a freshly cut face can run hot while the
+// rock beside it stays cold.
+func (f *floodmap) bakeGlowTexel(o int, v float64) {
+	h := float64(f.hotAge[o/4]) / 255
+	f.pix[o] = uint8(v * lerp(float64(floodGlowColor.R), float64(hotRockColor.R), h))
+	f.pix[o+1] = uint8(v * lerp(float64(floodGlowColor.G), float64(hotRockColor.G), h))
+	f.pix[o+2] = uint8(v * lerp(float64(floodGlowColor.B), float64(hotRockColor.B), h))
+	f.pix[o+3] = uint8(v * 255)
 }
 
 // cellOf returns the cell index for a world point, or -1 outside the grid.
@@ -619,10 +653,10 @@ func (f *floodmap) scorch(x, y, reach float64) {
 			if math.Hypot(px-x, py-y) > reach {
 				continue
 			}
-			if f.hotAge[i] < hotEps {
+			if f.hotAge[i] == 0 {
 				f.hotCells = append(f.hotCells, int32(i)) // #nosec G115 -- cell count fits an int32 by construction
 			}
-			f.hotAge[i] = 1
+			f.hotAge[i] = 255
 		}
 	}
 }
@@ -639,13 +673,11 @@ func (f *floodmap) coolHotRock() {
 	kept := f.hotCells[:0]
 	for _, ci := range f.hotCells {
 		i := int(ci)
-		f.hotAge[i] *= hotDecay
-		if f.hotAge[i] < hotEps {
-			f.hotAge[i] = 0 // one last bake below wipes the tint
-		} else {
-			kept = append(kept, ci)
+		f.hotAge[i] = uint8(float32(f.hotAge[i]) * hotDecay) // the floor makes 0 reachable
+		if f.hotAge[i] > 0 {
+			kept = append(kept, ci) // still cooling; a zeroed cell bakes cold once and leaves
 		}
-		f.bakeCell(i)
+		f.rebakeHot(i)
 		cx, cy := i%f.cols, i/f.cols
 		x0, y0 = min(x0, cx), min(y0, cy)
 		x1, y1 = max(x1, cx), max(y1, cy)
@@ -794,7 +826,7 @@ func (f *floodmap) sync() {
 	}
 	if f.dugImg == nil {
 		f.dugImg = ebiten.NewImage(f.cols, f.rows)
-		f.dugImg.WritePixels(f.dugPix)
+		f.uploadDugAll()
 	}
 }
 

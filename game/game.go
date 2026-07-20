@@ -145,6 +145,9 @@ type Game struct {
 	visPoly              []vec2      // scratch: the returned polygon, reused per stamp
 	fogPath              vector.Path // scratch: the polygon stamped into fogTex, reused per stamp
 
+	miniSpans    [][4]float64 // cached revealed wall spans (world coords) for the minimap
+	miniSpansRev int          // discovery revision the cache was built at (0 = never)
+
 	boostFuel  float64 // afterburner fuel remaining (0..boostMax)
 	boosting   bool    // the booster is engaged this frame (raises the speed cap)
 	boostArmed bool    // false while locked out after emptying, until the fuel recharges past the re-arm threshold

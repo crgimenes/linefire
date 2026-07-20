@@ -1,7 +1,6 @@
 package game
 
 import (
-	"linefire/filoio"
 	"math"
 	"math/rand/v2"
 
@@ -176,12 +175,7 @@ func (g *Game) hordeAssetFor(kind string) hordeAsset {
 		return ha
 	}
 	ha := hordeAsset{}
-	a, err := filoio.LoadAssetFS(g.content, g.mapDir, kind)
-	if err == nil {
-		ha.a = a
-		ha.mesh = render.BuildLayersMesh(a.Layers)
-		ha.glow = render.BuildGlowMesh(a.Layers)
-	}
+	ha.a, ha.mesh, ha.glow = loadCachedAsset(g.content, g.mapDir, kind) // session cache: shared with buildEntities
 	h.assets[kind] = ha
 	return ha
 }

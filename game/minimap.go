@@ -38,15 +38,23 @@ func (g *Game) drawMinimap(dst *ebiten.Image) {
 		return (wx-g.x)*scale + cx, (wy-g.y)*scale + cy
 	}
 
-	// Walls revealed by vision/brush, each span clipped to the scope circle.
-	for i := range g.segs {
-		for _, sp := range g.seenSpans(g.segs[i]) {
-			ax, ay := toMap(sp[0], sp[1])
-			bx, by := toMap(sp[2], sp[3])
-			nx0, ny0, nx1, ny1, ok := clipSegToCircle(ax, ay, bx, by, cx, cy, miniRadius)
-			if ok {
-				vector.StrokeLine(dst, float32(nx0), float32(ny0), float32(nx1), float32(ny1), 1, miniWall, true)
-			}
+	// Walls revealed by vision/brush, each span clipped to the scope circle. The
+	// spans are CACHED in world coordinates and rebuilt only when discovery gains
+	// a cell — re-sampling every wall against the fog grid each frame (seenSpans)
+	// was a per-frame cost proportional to the whole map.
+	if d := g.disc; d.rev != g.miniSpansRev {
+		g.miniSpansRev = d.rev
+		g.miniSpans = g.miniSpans[:0]
+		for i := range g.segs {
+			g.miniSpans = append(g.miniSpans, g.seenSpans(g.segs[i])...)
+		}
+	}
+	for _, sp := range g.miniSpans {
+		ax, ay := toMap(sp[0], sp[1])
+		bx, by := toMap(sp[2], sp[3])
+		nx0, ny0, nx1, ny1, ok := clipSegToCircle(ax, ay, bx, by, cx, cy, miniRadius)
+		if ok {
+			strokeLine(dst, nx0, ny0, nx1, ny1, 1, miniWall)
 		}
 	}
 
@@ -59,7 +67,7 @@ func (g *Game) drawMinimap(dst *ebiten.Image) {
 		}
 		mx, my := toMap(e.x, e.y)
 		if math.Hypot(mx-cx, my-cy) <= miniRadius {
-			vector.FillCircle(dst, float32(mx), float32(my), 2, markerColor(e.align), true)
+			fillCircle(dst, mx, my, 2, markerColor(e.align))
 		}
 	}
 
