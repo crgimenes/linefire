@@ -46,12 +46,16 @@ const (
 	huntLeash    = 280.0 // hard cap on roam from the ship, so it never strays far from its charge
 	huntSpeed    = 4.0   // world units per frame an escort moves while hunting or regrouping
 
-	// formationRideDist: within this of its slot the escort RIDES it — position locked
-	// to the slot, hull matching the SHIP's heading — instead of steering at the point
-	// it already sits on. The slot moves with every turn (a rank-2 slot sweeps ~5 wu
-	// per turning frame, plus the ship's speed), so it must exceed the slot's own
-	// per-frame travel or the ride breaks into chase jitter every frame.
-	formationRideDist = 16.0
+	// LAZY formation. A parked escort does not move AT ALL — tracking the slot
+	// every frame (even eased) re-positioned it after the ship's every twitch, which
+	// read as trembling. Instead it rests where it parked and only takes off once
+	// its slot has drifted past formationChaseDist, then flies the chase (facing its
+	// travel — the trailing pursuit) and parks again within formationSettleDist.
+	// The wide gap between the two radii is the point: a loose, delayed formation,
+	// not a tight one, and no boundary flapping between resting and chasing.
+	formationChaseDist  = 60.0 // a resting escort takes off once its slot is this far
+	formationSettleDist = 12.0 // a chasing escort parks once this close to the slot
+	formationAlignRate  = 1.0  // deg/frame a parked escort turns into the ship's heading
 
 	escortScale = 0.62 // player-hull scale for an escort
 	droneScale  = 0.46 // player-hull scale for a drone
@@ -66,6 +70,7 @@ type ally struct {
 	fireCD  int
 	hits    int  // enemy shots it can still take before it is destroyed
 	hunting bool // escort only: engaged with a nearby enemy (breaks the formation)
+	resting bool // escort only: parked near its slot; it will not move until the slot drifts far
 
 	// A* navigation state for an aggressive escort, mirroring the enemy pursuit fields.
 	path     []vec2
@@ -216,15 +221,21 @@ func (g *Game) stepEscort(a *ally, idx, n int) {
 		return
 	}
 
-	// Nothing to fight: formation. Near the slot the escort rides it rigidly in the
-	// SHIP's heading. Steering at the slot every frame instead left the escort glued
-	// on top of it, re-facing wherever the moving slot dragged it — "always pointing
-	// at the player", jittering through every turn.
+	// Nothing to fight: the lazy formation. A parked escort holds still (only its
+	// hull drifts into the ship's heading) and ignores the slot's every twitch;
+	// it flies again only once the slot has drifted well away, and parks again
+	// when it gets close. See the formation* constants for why.
 	gx, gy := g.escortSlot(idx)
-	if math.Hypot(gx-a.x, gy-a.y) <= formationRideDist {
-		a.x, a.y = gx, gy
-		a.angle = g.angle
-		a.path, a.pathStep = nil, 0 // the ride needs no route; drop any stale one
+	dist := math.Hypot(gx-a.x, gy-a.y)
+	if a.resting && dist > formationChaseDist {
+		a.resting = false
+	}
+	if !a.resting && dist <= formationSettleDist {
+		a.resting = true
+	}
+	if a.resting {
+		a.angle = turnToward(a.angle, g.angle, formationAlignRate)
+		a.path, a.pathStep = nil, 0 // parked: no route to keep
 		return
 	}
 	wx, wy := g.allyWaypoint(a, gx, gy)

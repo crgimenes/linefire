@@ -29,30 +29,56 @@ func TestSteerDelta(t *testing.T) {
 
 // TestTouchTurnStep: the steering response curve — dead inside the angular
 // deadzone (straight flight tolerates thumb error), proportional above it, and
-// capped at the full keyboard turn rate for hard pushes. The flat full-rate
+// capped at the full keyboard turn rate only on a full throw. The flat full-rate
 // response made straight flight nearly impossible: any misalignment turned the
 // ship at 3°/frame indefinitely.
 func TestTouchTurnStep(t *testing.T) {
 	cases := []struct {
-		delta, want float64
+		delta, throw, want float64
 	}{
-		{0, 0},                        // dead ahead: fly straight
-		{touchTurnDeadDeg - 1, 0},     // inside the deadzone: still straight
-		{-(touchTurnDeadDeg - 1), 0},  // symmetric
-		{touchTurnRampDeg, turnSpeed}, // ramp end: full rate
-		{90, turnSpeed},               // hard push: capped at full rate
-		{-90, -turnSpeed},             // capped, signed
+		{0, 1, 0},                            // dead ahead: fly straight
+		{touchTurnDeadDeg - 1, 1, 0},         // inside the angular deadzone: still straight
+		{-(touchTurnDeadDeg - 1), 1, 0},      // symmetric
+		{touchTurnRampDeg, 1, turnSpeed},     // ramp end, full throw: full rate
+		{90, 1, turnSpeed},                   // hard push, full throw: capped at full rate
+		{-90, 1, -turnSpeed},                 // capped, signed
+		{90, 0, turnSpeed * touchThrowFloor}, // barely-deflected thumb: floor authority only
 	}
 	for _, c := range cases {
-		if got := touchTurnStep(c.delta); math.Abs(got-c.want) > 1e-9 {
-			t.Fatalf("touchTurnStep(%v) = %v, want %v", c.delta, got, c.want)
+		if got := touchTurnStep(c.delta, c.throw); math.Abs(got-c.want) > 1e-9 {
+			t.Fatalf("touchTurnStep(%v, %v) = %v, want %v", c.delta, c.throw, got, c.want)
 		}
 	}
 	// Midway up the ramp the response is proportional: more error, more turn,
 	// but strictly under the cap.
-	mid := touchTurnStep((touchTurnDeadDeg + touchTurnRampDeg) / 2)
+	mid := touchTurnStep((touchTurnDeadDeg+touchTurnRampDeg)/2, 1)
 	if mid <= 0 || mid >= turnSpeed {
 		t.Fatalf("mid-ramp response should be a partial turn, got %v", mid)
+	}
+	// A half throw commands strictly less than a full throw at the same error.
+	if a, b := touchTurnStep(90, 0.5), touchTurnStep(90, 1); a >= b {
+		t.Fatalf("half throw (%v) should turn slower than full throw (%v)", a, b)
+	}
+}
+
+// TestTouchThrow: the radial deflection maps onto turn authority — zero at the
+// radial deadzone, full at touchThrowFullPx, clamped outside, DPI-scaled.
+func TestTouchThrow(t *testing.T) {
+	if got := touchThrow(touchDeadzonePx, 1); got != 0 {
+		t.Fatalf("at the deadzone the throw should be 0, got %v", got)
+	}
+	if got := touchThrow(touchThrowFullPx, 1); got != 1 {
+		t.Fatalf("at the full-throw radius the throw should be 1, got %v", got)
+	}
+	if got := touchThrow(touchThrowFullPx*3, 1); got != 1 {
+		t.Fatalf("past full throw it clamps to 1, got %v", got)
+	}
+	half := touchThrow((touchDeadzonePx+touchThrowFullPx)/2, 1)
+	if math.Abs(half-0.5) > 1e-9 {
+		t.Fatalf("midway should be half authority, got %v", half)
+	}
+	if got := touchThrow(touchThrowFullPx*2, 2); math.Abs(got-1) > 1e-9 {
+		t.Fatalf("the throw should scale with the DPI, got %v", got)
 	}
 }
 

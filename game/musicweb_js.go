@@ -2,7 +2,10 @@
 
 package game
 
-import "syscall/js"
+import (
+	"sync"
+	"syscall/js"
+)
 
 // Web profile: MP3 music plays through an HTMLAudioElement, so the BROWSER's
 // media pipeline fetches, decodes and mixes it off the wasm main thread. oto's
@@ -16,17 +19,80 @@ import "syscall/js"
 // setVolume mirrors volume==0 into it.
 const webAudioMusic = true
 
-// webTrackURLs caches one Blob object URL per theme path, so replaying a theme
-// never re-copies the MP3 bytes into JS.
-var webTrackURLs = map[string]js.Value{}
+var (
+	webAudioOnce sync.Once
+	webAudioEl   js.Value // THE audio element — one per process (see ensureWebAudioEl)
+	webSwallow   js.Func  // shared no-op rejection handler: an autoplay-gate refusal is expected, not an error
 
-// webTrack is one playing HTMLAudioElement.
+	// webTrackURLs caches one Blob object URL per theme path, so replaying a
+	// theme never re-copies the MP3 bytes into JS.
+	webTrackURLs = map[string]js.Value{}
+
+	// liveWebTrack is the track that SHOULD be on the air — the target the
+	// gesture listeners retry. Package level: the bank swaps tracks, the
+	// listeners are registered once.
+	liveWebTrack *webTrack
+)
+
+// ensureWebAudioEl builds the single persistent <audio> element and hooks the
+// page's user gestures. iOS only honors a programmatic play() on an element that
+// was unlocked INSIDE a real user-gesture call stack — a fresh element per track
+// (the first cut) stayed locked forever when no gesture followed the track
+// switch, which is why the iPad attract sometimes had effects but no music. One
+// persistent element keeps its unlock across every track switch, and every
+// pointer/touch/key gesture retries the pending track right there, inside the
+// sanctioned call stack.
+func ensureWebAudioEl() js.Value {
+	webAudioOnce.Do(func() {
+		webAudioEl = js.Global().Get("Audio").New()
+		webSwallow = js.FuncOf(func(js.Value, []js.Value) any { return nil })
+		retry := js.FuncOf(func(js.Value, []js.Value) any {
+			t := liveWebTrack
+			if t != nil && t.el.Get("paused").Bool() && !t.el.Get("ended").Bool() {
+				webUnlockPending = true // this gesture woke the audio; the game gives it no second job
+				t.el.Call("play").Call("catch", webSwallow)
+			}
+			return nil
+		})
+		doc := js.Global().Get("document")
+		opts := map[string]any{"passive": true}
+		doc.Call("addEventListener", "pointerdown", retry, opts)
+		doc.Call("addEventListener", "touchend", retry, opts)
+		doc.Call("addEventListener", "keydown", retry)
+	})
+	return webAudioEl
+}
+
+// webMusicBlocked reports a track is pending but the browser's autoplay gate is
+// still closed (no user gesture since the page loaded — e.g. iOS reloaded the
+// tab under the idle attract). The title shows a "tap for sound" hint on it:
+// audio before a gesture is a browser impossibility, so the honest move is to
+// ask for the tap.
+func webMusicBlocked() bool {
+	t := liveWebTrack
+	return t != nil && t.el.Get("paused").Bool() && !t.el.Get("ended").Bool()
+}
+
+// webUnlockPending latches when a user gesture just woke a blocked track, so the
+// game can give that gesture no second meaning (a "tap for sound" must not also
+// start a run or leave the credits).
+var webUnlockPending bool
+
+// consumeWebUnlock reports (and clears) the latch.
+func consumeWebUnlock() bool {
+	v := webUnlockPending
+	webUnlockPending = false
+	return v
+}
+
+// webTrack is one theme riding the shared element.
 type webTrack struct {
 	el   js.Value
 	tick int // poke cadence counter for the autoplay-gate retry
 }
 
 func newWebTrack(key string, data []byte, loop bool, vol float64) *webTrack {
+	el := ensureWebAudioEl()
 	url, ok := webTrackURLs[key]
 	if !ok {
 		buf := js.Global().Get("Uint8Array").New(len(data))
@@ -35,25 +101,19 @@ func newWebTrack(key string, data []byte, loop bool, vol float64) *webTrack {
 		url = js.Global().Get("URL").Call("createObjectURL", blob)
 		webTrackURLs[key] = url
 	}
-	el := js.Global().Get("Audio").New(url)
 	el.Set("loop", loop)
+	el.Set("src", url)
 	t := &webTrack{el: el}
 	t.setVolume(vol)
+	liveWebTrack = t
 	t.tryPlay()
 	return t
 }
 
 // tryPlay starts playback, swallowing the promise rejection the browser throws
-// while its autoplay gate is still closed (before the first user gesture); poke
-// retries until it opens.
+// while its autoplay gate is still closed; the gesture listeners and poke retry.
 func (t *webTrack) tryPlay() {
-	p := t.el.Call("play")
-	var swallow js.Func
-	swallow = js.FuncOf(func(js.Value, []js.Value) any {
-		swallow.Release()
-		return nil
-	})
-	p.Call("catch", swallow)
+	t.el.Call("play").Call("catch", webSwallow)
 }
 
 // done reports a one-shot track has played through (loops never end).
@@ -69,19 +129,21 @@ func (t *webTrack) setVolume(v float64) {
 	t.el.Set("muted", v <= 0)
 }
 
-// stop halts playback and detaches the media resource so the browser can free
-// its decoder promptly (the object URL stays cached for the next play).
+// stop halts playback. The element and its unlock are kept (they are shared);
+// only the claim to the air is dropped.
 func (t *webTrack) stop() {
 	if t == nil {
 		return
 	}
 	t.el.Call("pause")
-	t.el.Set("src", "")
-	t.el.Call("load")
+	if liveWebTrack == t {
+		liveWebTrack = nil
+	}
 }
 
-// poke retries a play blocked by the autoplay gate, about once a second. Called
-// every frame from soundBank.update; a playing or finished track is a no-op.
+// poke retries a play blocked by the autoplay gate, about once a second — the
+// fallback for desktop policies where any prior gesture unlocks playback without
+// a listener firing. Called every frame from soundBank.update.
 func (t *webTrack) poke() {
 	if t == nil {
 		return

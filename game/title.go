@@ -80,6 +80,11 @@ func (g *Game) drawTitle(dst *ebiten.Image) {
 		g.titleText(dst, "PRESS SPACE TO START", cx, float64(h)*0.74, 2)
 	}
 	g.titleText(dst, "C: CREDITS", cx, float64(h)*0.82, 1.2)
+	if webMusicBlocked() {
+		// Web only: the browser refuses ALL audio until a user gesture (an iOS tab
+		// reload lands here silent). Nothing can be played before a tap, so say so.
+		g.titleText(dst, "TAP FOR SOUND", cx, float64(h)*0.88, 1.2)
+	}
 }
 
 // attractShowingRecords reports whether the front door is on its records half this frame. A

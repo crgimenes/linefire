@@ -87,6 +87,64 @@ func TestMusicNilBankIsSafe(t *testing.T) {
 	g.prewarmMusic()
 }
 
+// TestJukeboxKeepsPicking: with no authored theme claiming the air and nothing
+// playing, the jukebox draws random tracks from the bank's content, never
+// repeating the current pick back-to-back — crossing themeless screens chains
+// songs instead of going silent. Nil and muted banks stay safe no-ops.
+func TestJukeboxKeepsPicking(t *testing.T) {
+	var nilBank *soundBank
+	nilBank.stepJukebox() // must not panic
+
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/music", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"a.mp3", "b.mp3", "c.mp3"} {
+		if err := os.WriteFile(root+"/music/"+n, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b := &soundBank{content: os.DirFS(root)}
+
+	b.muted = true
+	b.stepJukebox()
+	if b.jukeTrack != "" {
+		t.Fatal("a muted bank should not spin the jukebox")
+	}
+
+	b.muted = false
+	b.stepJukebox()
+	if b.jukeTrack == "" {
+		t.Fatal("the jukebox should pick a track when nothing is playing")
+	}
+	// Nothing actually plays headless (the fake mp3 fails to decode), so every
+	// step re-picks — and the pick must never repeat the current track.
+	for range 20 {
+		cur := b.jukeTrack
+		b.stepJukebox()
+		if b.jukeTrack == cur {
+			t.Fatalf("the jukebox repeated %q back-to-back", cur)
+		}
+	}
+}
+
+// TestUpdateMusicFallsBackToJukebox: a screen with no theme of its own hands the
+// air to the jukebox instead of stopping the music (the old behavior).
+func TestUpdateMusicFallsBackToJukebox(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/music", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(root+"/music/only.mp3", []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	g := &Game{level: level.New(), sfx: &soundBank{content: os.DirFS(root)}}
+	g.updateMusic()
+	if g.sfx.jukeTrack != "music/only.mp3" {
+		t.Fatalf("a themeless screen should start the jukebox, got %q", g.sfx.jukeTrack)
+	}
+}
+
 // TestTracksFromDir: only .mp3 files are listed (case-insensitive), dir-prefixed and sorted; a
 // missing directory yields nil, so a procedural stage falls back to silence instead of crashing.
 func TestTracksFromDir(t *testing.T) {

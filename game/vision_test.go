@@ -162,3 +162,60 @@ func TestDiscoveryBoundedToReach(t *testing.T) {
 		t.Fatal("a cell well beyond the on-screen reach (clear LOS) must not be discovered yet")
 	}
 }
+
+// TestVisibilityOpensThroughDugRock guards the playtest bug: destroying a wall
+// did NOT open the fog — the sight rays tested the authored segments, which
+// outlive the rock they drew. On a flood map the rays march the region grid, so
+// a hole carved through a wall lets a cone of vision through it (and a revisited
+// map's restored tunnels clear on the first stamp).
+func TestVisibilityOpensThroughDugRock(t *testing.T) {
+	// A box arena split by a vertical wall through the middle.
+	wall := []asset.Command{
+		{Op: asset.OpMoveTo, X: 200, Y: 20},
+		{Op: asset.OpLineTo, X: 200, Y: 380},
+	}
+	lvl := boxLevel(400, 400, wall)
+	segs := wallSegments(lvl)
+	g := &Game{segs: segs, bounds: mapBounds(lvl, segs)}
+	g.flood = buildFloodmap(segs, 100, 200, g.bounds) // seeded on the LEFT side
+	if g.flood == nil {
+		t.Fatal("expected a floodmap")
+	}
+
+	crossed := func(poly []vec2) bool {
+		for _, p := range poly {
+			if math.Abs(p.y-200) < 30 && p.x > 220 {
+				return true
+			}
+		}
+		return false
+	}
+
+	if crossed(g.visibilityPolygon(100, 200, 400)) {
+		t.Fatal("with the wall intact, vision must not reach the far side")
+	}
+
+	// Blast a hole straight through the middle wall at the ship's height.
+	g.flood.carve(200, 200, 30)
+	if crossed(g.visibilityPolygon(100, 200, 400)) == false {
+		t.Fatal("a hole through the wall should open a sight cone to the far side")
+	}
+}
+
+// TestDigForcesFogRestamp: a dig must reset the fog-stamp skip even for a ship
+// holding still — the rock face moved, so the sight lines did.
+func TestDigForcesFogRestamp(t *testing.T) {
+	lvl := boxLevel(400, 400, nil)
+	segs := wallSegments(lvl)
+	g := &Game{segs: segs, bounds: mapBounds(lvl, segs)}
+	g.flood = buildFloodmap(segs, 200, 200, g.bounds)
+	g.fogStamped = true // as after a previous stamp with the ship parked
+
+	if !g.flood.carve(20, 200, 20) { // bite the west wall (must actually remove rock)
+		t.Fatal("test setup: the bite should remove rock")
+	}
+	g.refreshFlood()
+	if g.fogStamped {
+		t.Fatal("a dig should force the next fog stamp")
+	}
+}

@@ -79,7 +79,7 @@ func (g *Game) extendPastEdge(breachSide int) {
 	}
 	seed := edgeSeed(g.mapName, g.digDepth, breachSide, g.runTicks)
 	lvl := procgen.GenEdgeRoom(seed, oppositeEdge(breachSide), g.digDepth, ret)
-	lvl.Music = g.randomTrack() // give the generated screen a random track instead of silence
+	// Themeless on purpose: the song on the air plays on; the jukebox rotates it.
 	g.logf(">>> BREACH  depth %d — the rock opens <<<", g.digDepth)
 	g.enterMap(lvl, fmt.Sprintf("@edge%d", g.digDepth), "from_edge", false)
 }

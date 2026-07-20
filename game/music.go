@@ -16,17 +16,6 @@ import (
 	"linefire/sfx"
 )
 
-// Procedural stages (bonus caves, edge rooms) carry no authored (music ...), so they used to run
-// silent. Instead we hand them a random MP3 from the music/ directory, resolved the same way an
-// authored level's (music "music/foo.mp3") is — through the content FS, so the embedded bundle
-// and a directory on disk both work.
-
-// musicTracks lists the available MP3 theme paths under the content's music/ directory, sorted for
-// a stable order (empty when it is absent — e.g. headless tests — so callers leave the stage silent).
-func (g *Game) musicTracks() []string {
-	return tracksFromDir(g.content, "music")
-}
-
 // tracksFromDir returns the ".mp3" files in dir as "<dir>/<name>" theme paths, sorted for a
 // stable order. nil when the directory is unreadable.
 func tracksFromDir(fsys fs.FS, dir string) []string {
@@ -45,18 +34,6 @@ func tracksFromDir(fsys fs.FS, dir string) []string {
 	}
 	slices.Sort(out)
 	return out
-}
-
-// randomTrack picks a random MP3 theme for a procedural stage, or "" if none are available.
-func (g *Game) randomTrack() string {
-	tracks := g.musicTracks()
-	if len(tracks) == 0 {
-		return ""
-	}
-	if g.rng == nil {
-		return tracks[0]
-	}
-	return tracks[g.rng.IntN(len(tracks))]
 }
 
 // Theme music. A theme names either an MP3 FILE (a path ending in .mp3 — produced
@@ -164,7 +141,7 @@ func (b *soundBank) playMusic(name string, seed int64, loop bool) {
 			return
 		}
 		b.webMusic = newWebTrack(name, data, loop, b.master*musicVolume)
-		b.musicKey = key
+		b.musicKey, b.musicName = key, name
 		return
 	}
 	src := b.musicSource(name, seed, loop)
@@ -178,7 +155,7 @@ func (b *soundBank) playMusic(name string, seed int64, loop bool) {
 	player.SetVolume(b.master * musicVolume)
 	player.Play()
 	b.music = player
-	b.musicKey = key
+	b.musicKey, b.musicName = key, name
 }
 
 // onAir reports the current track still holds the air: an oto player that is
@@ -192,18 +169,6 @@ func (b *soundBank) onAir() bool {
 	return b.music != nil && b.music.IsPlaying()
 }
 
-// musicDone reports that a one-shot track has played through to its end. A looping track never
-// finishes, so this only ever fires for the attract demo's non-looping songs.
-func (b *soundBank) musicDone() bool {
-	if b == nil {
-		return false
-	}
-	if b.webMusic != nil {
-		return b.webMusic.done()
-	}
-	return b.music != nil && !b.music.IsPlaying()
-}
-
 // stopMusic silences the soundtrack.
 func (b *soundBank) stopMusic() {
 	if b == nil {
@@ -211,13 +176,12 @@ func (b *soundBank) stopMusic() {
 	}
 	b.webMusic.stop()
 	b.webMusic = nil
+	b.musicKey, b.musicName = "", ""
 	if b.music == nil {
-		b.musicKey = ""
 		return
 	}
 	_ = b.music.Close()
 	b.music = nil
-	b.musicKey = ""
 }
 
 // desiredMusic picks this frame's track: the strongest engaged enemy that declares
@@ -249,42 +213,54 @@ func (g *Game) desiredMusic() (string, int64, bool) {
 
 // updateMusic drives the soundtrack from the combat state. Called every live frame;
 // track switches are cheap because the PCM is cached.
+// The rule (crg's spec): the music NEVER goes silent. A screen with its own theme
+// takes the air (combat themes over stage themes, as before); a screen WITHOUT one
+// leaves whatever song is playing alone, and when a song ends the jukebox draws the
+// next random track — crossing themeless screens just chains random songs until a
+// themed one takes over.
 func (g *Game) updateMusic() {
-	// The attract demo runs its own soundtrack: full, non-looping random tracks that play out and
-	// only THEN advance — never the combat themes (it is always fighting, which would drown them).
+	// The attract demo runs the jukebox directly: full, non-looping random tracks —
+	// never the combat themes (it is always fighting, which would drown them).
 	if g.creditsMode {
-		g.updateCreditsMusic()
+		g.sfx.stepJukebox()
 		return
 	}
 	mood, seed, ok := g.desiredMusic()
-	if !ok {
-		g.sfx.stopMusic()
+	if ok {
+		g.sfx.playMusic(mood, seed, true)
 		return
 	}
-	g.sfx.playMusic(mood, seed, true)
+	g.sfx.stepJukebox()
 }
 
-// updateCreditsMusic keeps a full random track playing under the attract demo: it plays through
-// ONCE, and only when it ends is another random track picked (so the 20s backdrop swap never cuts
-// the music). g.creditsTrack survives the swap; g.rng varies the pick across the run.
-func (g *Game) updateCreditsMusic() {
-	if g.sfx == nil {
+// stepJukebox keeps a song on the air when no authored theme claims it: an mp3
+// already playing (a previous screen's theme, or an earlier pick) plays on; a
+// synthesized combat sting whose fight is over is dropped; and once nothing is
+// playing, the next random track starts. It lives on the BANK — the one object
+// every world reset carries — so a map change or attract backdrop swap never
+// restarts or drops the song mid-play.
+func (b *soundBank) stepJukebox() {
+	if b == nil || b.silent() {
 		return
 	}
-	if g.creditsTrack == "" || g.sfx.musicDone() {
-		g.creditsTrack = g.nextCreditsTrack(g.creditsTrack)
+	if b.onAir() {
+		if sfx.IsMusicFile(b.musicName) {
+			return // a song holds the air until it ends on its own
+		}
+		b.stopMusic() // a gion (combat) theme lost its claim: hand the air to the jukebox
 	}
-	if g.creditsTrack == "" {
+	b.jukeTrack = b.nextJukeTrack(b.jukeTrack)
+	if b.jukeTrack == "" {
 		return // no music/ directory (e.g. headless tests) — stay silent
 	}
-	g.sfx.playMusic(g.creditsTrack, 0, false)
+	b.playMusic(b.jukeTrack, 0, false)
 }
 
-// nextCreditsTrack picks a random attract track, avoiding an immediate repeat of cur when more
-// than one is available. Uses the auto-seeded global RNG (not the deterministic loot RNG), so the
-// attract soundtrack varies per launch. "" when there is no music/ directory.
-func (g *Game) nextCreditsTrack(cur string) string {
-	tracks := g.musicTracks()
+// nextJukeTrack picks a random track, avoiding an immediate repeat of cur when more
+// than one is available. Uses the auto-seeded global RNG, so the rotation varies per
+// launch. "" when there is no music/ directory.
+func (b *soundBank) nextJukeTrack(cur string) string {
+	tracks := tracksFromDir(b.content, "music")
 	if len(tracks) == 0 {
 		return ""
 	}

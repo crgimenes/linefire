@@ -38,8 +38,17 @@ const (
 	// Instead: inside the angular deadzone the ship flies straight (thrust only),
 	// and above it the turn rate ramps up, reaching full turnSpeed only past the
 	// ramp — small thumb errors drift gently, a hard sideways push still whips.
-	touchTurnDeadDeg = 8.0  // |heading error| under this: no turn, just thrust
-	touchTurnRampDeg = 40.0 // full turn rate only past this much heading error
+	touchTurnDeadDeg = 10.0 // |heading error| under this: no turn, just thrust
+	touchTurnRampDeg = 60.0 // full turn rate only past this much heading error
+
+	// Radial authority: how far the thumb is THROWN scales the turn like an analog
+	// stick. Just past the radial deadzone — where the direction reading is at its
+	// noisiest, a couple of pixels swinging many degrees — the stick commands only
+	// touchThrowFloor of the rate; full authority needs a deliberate throw. This is
+	// the iPhone fix: small screens mean small thumb throws, and the angular curve
+	// alone still spun the ship on every grazing touch.
+	touchThrowFullPx = 70.0 // radial deflection (logical px) for full turn authority
+	touchThrowFloor  = 0.25 // authority fraction just past the radial deadzone
 	touchAimReachPx  = 220. // how far from the ship the synthetic turret "cursor" sits
 	stickRingPx      = 46.0 // stick base ring radius (drawn), logical px
 	stickKnobPx      = 14.0 // stick knob radius (drawn), logical px
@@ -78,10 +87,11 @@ func steerDelta(dx, dy float64) float64 {
 	return normDeg(math.Atan2(dy, dx)*180/math.Pi + 90)
 }
 
-// touchTurnStep maps a heading error (degrees, from steerDelta) to this frame's
-// signed turn, applying the angular deadzone and the proportional ramp up to
-// turnSpeed. Pure, so the response curve is testable.
-func touchTurnStep(delta float64) float64 {
+// touchTurnStep maps a heading error (degrees, from steerDelta) and the radial
+// throw (0..1, from touchThrow) to this frame's signed turn: the angular deadzone
+// and ramp shape the response, and the throw scales its authority. Pure, so the
+// response curve is testable.
+func touchTurnStep(delta, throw float64) float64 {
 	mag := math.Abs(delta)
 	if mag <= touchTurnDeadDeg {
 		return 0
@@ -90,7 +100,30 @@ func touchTurnStep(delta float64) float64 {
 	if frac > 1 {
 		frac = 1
 	}
-	return math.Copysign(turnSpeed*frac, delta)
+	authority := touchThrowFloor + (1-touchThrowFloor)*clamp01(throw)
+	return math.Copysign(turnSpeed*frac*authority, delta)
+}
+
+// touchThrow maps the stick's radial deflection (device px) to its turn authority
+// fraction: 0 at the radial deadzone, 1 at a full throw.
+func touchThrow(mag, dpr float64) float64 {
+	dead := touchDeadzonePx * dpr
+	full := touchThrowFullPx * dpr
+	if full <= dead {
+		return 1
+	}
+	return clamp01((mag - dead) / (full - dead))
+}
+
+// clamp01 clamps v to [0, 1].
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }
 
 // claimThumb assigns a fresh touch to the half its ORIGIN is in (crossing the middle
@@ -181,8 +214,9 @@ func (g *Game) applyTouchControls() bool {
 
 	if tc.left.active {
 		dx, dy := tc.left.deflection()
-		if math.Hypot(dx, dy) > touchDeadzonePx*g.dpr {
-			g.angle += touchTurnStep(steerDelta(dx, dy))
+		mag := math.Hypot(dx, dy)
+		if mag > touchDeadzonePx*g.dpr {
+			g.angle += touchTurnStep(steerDelta(dx, dy), touchThrow(mag, g.dpr))
 			fx, fy, _, _ := g.headingDirs()
 			g.vx += fx * thrust
 			g.vy += fy * thrust

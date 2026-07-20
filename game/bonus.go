@@ -20,7 +20,8 @@ func (g *Game) enterBonus(returnTarget string) {
 		returnTarget = g.mapName + ":from_bonus"
 	}
 	lvl := procgen.GenCaveRoom(g.bonusSeed(), returnTarget)
-	lvl.Music = g.randomTrack() // procedural rooms carry no authored theme; give them a random one
+	// No music assigned: a generated room is a THEMELESS screen, so the song
+	// already playing carries over and the jukebox rotates it when it ends.
 	g.enterMap(lvl, bonusMapName, "", false)
 }
 

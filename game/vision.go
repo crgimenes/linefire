@@ -203,6 +203,12 @@ func rayHitsSegment(ox, oy, dx, dy float64, s segment) (float64, bool) {
 // Only walls within the radius can shape the polygon (a farther segment cannot
 // beat the radius cap), so the walls are prefiltered once into a reused scratch
 // slice: the cost is quadratic in NEARBY walls, not in the whole map's.
+// On a flood map the rays march the REGION GRID — the truth that includes dug
+// rock — instead of the authored segments, which outlive the walls they drew: a
+// hole blasted through a wall opens a sight cone through it (and a revisited
+// map's restored tunnels clear on the first stamp). The corner rays still come
+// from the authored geometry, keeping hard wall edges crisp; the fan covers the
+// openings the segments know nothing about.
 func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 	r2 := radius * radius
 	segs := g.visSegs[:0]
@@ -213,11 +219,7 @@ func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 	}
 	g.visSegs = segs
 
-	type hit struct{ ang, dist float64 }
-	hits := make([]hit, 0, 6*len(segs)+visRays)
-
-	cast := func(ang float64) {
-		dx, dy := math.Cos(ang), math.Sin(ang)
+	castDist := func(dx, dy float64) float64 {
 		best := radius
 		for _, s := range segs {
 			t, ok := rayHitsSegment(ox, oy, dx, dy, s)
@@ -225,7 +227,19 @@ func (g *Game) visibilityPolygon(ox, oy, radius float64) []vec2 {
 				best = t
 			}
 		}
-		hits = append(hits, hit{ang, best})
+		return best
+	}
+	if g.flood != nil {
+		f := g.flood
+		castDist = func(dx, dy float64) float64 { return f.rayToRock(ox, oy, dx, dy, radius) }
+	}
+
+	type hit struct{ ang, dist float64 }
+	hits := make([]hit, 0, 6*len(segs)+visRays)
+
+	cast := func(ang float64) {
+		dx, dy := math.Cos(ang), math.Sin(ang)
+		hits = append(hits, hit{ang, castDist(dx, dy)})
 	}
 
 	const eps = 0.0006
@@ -289,11 +303,12 @@ func (g *Game) drawBrushFog(screen *ebiten.Image) {
 	ox, oy := g.bounds.minX, g.bounds.minY
 
 	// The cleared texture is PERSISTENT and the stamp depends only on the ship's
-	// position (rotation never changes line of sight; the polygon tests the static
-	// wall segments), so a ship that has not moved since the last stamp has nothing
-	// new to clear — skip the whole polygon + stamp, the dominant per-frame CPU cost
-	// of the fog. Sub-texel drift accumulates against the last STAMPED position, so
-	// slow motion still re-stamps once it adds up.
+	// position and the rock (rotation never changes line of sight), so a ship that
+	// has not moved since the last stamp has nothing new to clear — skip the whole
+	// polygon + stamp, the dominant per-frame CPU cost of the fog. Sub-texel drift
+	// accumulates against the last STAMPED position, so slow motion still re-stamps
+	// once it adds up; a DIG resets fogStamped (refreshFlood), since moving the rock
+	// face moves the sight lines even under a ship that holds still.
 	moved := math.Hypot(g.x-g.fogStampX, g.y-g.fogStampY) >= 0.25
 	if !g.fogStamped || moved {
 		g.fogStamped = true
