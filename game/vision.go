@@ -37,6 +37,7 @@ type discovery struct {
 	cell             float64
 	originX, originY float64 // world coordinate of cell (0,0)
 	seen             []bool
+	rev              int // bumped on every newly seen cell, so caches derived from seen can invalidate
 }
 
 // newDiscovery sizes a discovery grid to the map bounds (with an origin), or
@@ -48,12 +49,17 @@ func newDiscovery(b bounds) *discovery {
 	}
 	cols := int(math.Ceil(w/fogCell)) + 1
 	rows := int(math.Ceil(h/fogCell)) + 1
-	return &discovery{cols: cols, rows: rows, cell: fogCell, originX: b.minX, originY: b.minY, seen: make([]bool, cols*rows)}
+	return &discovery{cols: cols, rows: rows, cell: fogCell, originX: b.minX, originY: b.minY, seen: make([]bool, cols*rows), rev: 1}
 }
 
 // markSeen records a cell as cleared.
 func (d *discovery) markSeen(cx, cy int) {
-	d.seen[cy*d.cols+cx] = true
+	i := cy*d.cols + cx
+	if d.seen[i] {
+		return
+	}
+	d.seen[i] = true
+	d.rev++
 }
 
 // cellAt returns the grid cell containing world point (wx,wy).

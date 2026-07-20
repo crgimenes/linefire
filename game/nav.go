@@ -1,7 +1,6 @@
 package game
 
 import (
-	"container/heap"
 	"math"
 )
 
@@ -32,6 +31,19 @@ type navgrid struct {
 	originX, originY float64 // world coordinate of cell (0,0)
 	blocked          []bool
 	heat             []float64 // extra A* cost per cell: hotter near walls, so paths run cool
+
+	// A* scratch, reused across searches — they run sequentially in the game
+	// loop, and building fresh maps + a heap per search was ~600 KB and 8½k
+	// allocations for one long path (44 MiB over a soak). The GENERATION stamp
+	// makes old entries invisible without clearing the arrays: a cell's
+	// came/gScore is valid only when its stamp equals the current generation.
+	gen       uint32
+	seenGen   []uint32 // cell -> generation came/gScore are valid for
+	closedGen []uint32 // cell -> generation the cell was closed in
+	came      []int32
+	gScore    []float64
+	open      navHeap
+	cells     []int32 // reconstruct scratch: goal..start cell walk
 }
 
 // buildNavgrid rasterizes the level walls into a blocked/free grid plus a heat
@@ -223,21 +235,36 @@ func (n *navgrid) findPath(sx, sy, tx, ty float64) []vec2 {
 		return []vec2{n.center(tcx, tcy)}
 	}
 
-	came := map[int]int{}
-	gScore := map[int]float64{start: 0}
-	closed := map[int]bool{}
-	open := &navHeap{{idx: start, f: n.heur(scx, scy, tcx, tcy)}}
-	heap.Init(open)
+	if len(n.seenGen) != n.cols*n.rows {
+		size := n.cols * n.rows
+		n.seenGen = make([]uint32, size)
+		n.closedGen = make([]uint32, size)
+		n.came = make([]int32, size)
+		n.gScore = make([]float64, size)
+	}
+	n.gen++
+	if n.gen == 0 { // a wrapped generation would alias ancient stamps: reset them
+		clear(n.seenGen)
+		clear(n.closedGen)
+		n.gen = 1
+	}
+	gen := n.gen
 
-	for open.Len() > 0 {
-		cur := heap.Pop(open).(navNode)
-		if closed[cur.idx] {
+	n.seenGen[start] = gen
+	n.came[start] = -1
+	n.gScore[start] = 0
+	open := &n.open
+	*open = append((*open)[:0], navNode{idx: start, f: n.heur(scx, scy, tcx, tcy)})
+
+	for len(*open) > 0 {
+		cur := open.pop()
+		if n.closedGen[cur.idx] == gen {
 			continue
 		}
 		if cur.idx == goal {
-			return n.reconstruct(came, goal)
+			return n.reconstruct(goal)
 		}
-		closed[cur.idx] = true
+		n.closedGen[cur.idx] = gen
 
 		ccx, ccy := cur.idx%n.cols, cur.idx/n.cols
 		for _, d := range navDirs {
@@ -249,16 +276,17 @@ func (n *navgrid) findPath(sx, sy, tx, ty float64) []vec2 {
 				continue // do not cut diagonally through a blocked corner
 			}
 			ni := ncy*n.cols + ncx
-			if closed[ni] {
+			if n.closedGen[ni] == gen {
 				continue
 			}
-			tentative := gScore[cur.idx] + d.cost*(1+n.heatAt(ni))
-			best, ok := gScore[ni]
-			if !ok || tentative < best {
-				came[ni] = cur.idx
-				gScore[ni] = tentative
-				heap.Push(open, navNode{idx: ni, f: tentative + n.heur(ncx, ncy, tcx, tcy)})
+			tentative := n.gScore[cur.idx] + d.cost*(1+n.heatAt(ni))
+			if n.seenGen[ni] == gen && tentative >= n.gScore[ni] {
+				continue
 			}
+			n.seenGen[ni] = gen
+			n.came[ni] = int32(cur.idx) // #nosec G115 -- cell count fits an int32 by construction
+			n.gScore[ni] = tentative
+			open.push(navNode{idx: ni, f: tentative + n.heur(ncx, ncy, tcx, tcy)})
 		}
 	}
 	return nil
@@ -268,21 +296,18 @@ func (n *navgrid) heur(cx, cy, tx, ty int) float64 {
 	return math.Hypot(float64(cx-tx), float64(cy-ty))
 }
 
-func (n *navgrid) reconstruct(came map[int]int, goal int) []vec2 {
-	var cells []int
-	for cur := goal; ; {
+func (n *navgrid) reconstruct(goal int) []vec2 {
+	cells := n.cells[:0]
+	for cur := int32(goal); cur >= 0; cur = n.came[cur] { // #nosec G115 -- cell count fits an int32 by construction
 		cells = append(cells, cur)
-		prev, ok := came[cur]
-		if !ok {
-			break
-		}
-		cur = prev
 	}
+	n.cells = cells
 	// cells is goal..start; emit start+1..goal as waypoints (the enemy is already
-	// at the start cell).
-	out := make([]vec2, 0, len(cells))
+	// at the start cell). The returned path is the search's ONE allocation: each
+	// entity keeps its result, so it cannot share scratch.
+	out := make([]vec2, 0, len(cells)-1)
 	for i := len(cells) - 2; i >= 0; i-- {
-		out = append(out, n.center(cells[i]%n.cols, cells[i]/n.cols))
+		out = append(out, n.center(int(cells[i])%n.cols, int(cells[i])/n.cols))
 	}
 	return out
 }
@@ -293,16 +318,49 @@ type navNode struct {
 	f   float64
 }
 
+// navHeap is a TYPED min-heap on f-score. container/heap boxes every node into
+// an `any`, which put one small heap allocation on every push — thousands per
+// long search; the typed sift functions keep the whole open set allocation-free.
 type navHeap []navNode
 
-func (h navHeap) Len() int           { return len(h) }
-func (h navHeap) Less(i, j int) bool { return h[i].f < h[j].f }
-func (h navHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h *navHeap) Push(x any)        { *h = append(*h, x.(navNode)) }
-func (h *navHeap) Pop() any {
-	old := *h
-	n := len(old)
-	it := old[n-1]
-	*h = old[:n-1]
-	return it
+// push adds v and sifts it up.
+func (h *navHeap) push(v navNode) {
+	*h = append(*h, v)
+	s := *h
+	i := len(s) - 1
+	for i > 0 {
+		parent := (i - 1) / 2
+		if s[parent].f <= s[i].f {
+			break
+		}
+		s[parent], s[i] = s[i], s[parent]
+		i = parent
+	}
+}
+
+// pop removes and returns the smallest-f node.
+func (h *navHeap) pop() navNode {
+	s := *h
+	top := s[0]
+	last := len(s) - 1
+	s[0] = s[last]
+	s = s[:last]
+	*h = s
+	i := 0
+	for {
+		l, r := 2*i+1, 2*i+2
+		small := i
+		if l < len(s) && s[l].f < s[small].f {
+			small = l
+		}
+		if r < len(s) && s[r].f < s[small].f {
+			small = r
+		}
+		if small == i {
+			break
+		}
+		s[i], s[small] = s[small], s[i]
+		i = small
+	}
+	return top
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"linefire/asset"
-	"linefire/filoio"
 	"linefire/level"
 	"linefire/render"
 )
@@ -166,30 +165,8 @@ func (e *entity) moveSpeed() float64 {
 // once (cached by name); a missing/invalid asset yields a nil-mesh entity (drawn as a
 // marker), never an error that stops the game.
 func buildEntities(content fs.FS, l *level.Level, dir string) []entity {
-	assets := map[string]*asset.Asset{}
-	meshes := map[string]*render.Mesh{}
-	glows := map[string]*render.Mesh{}
 	load := func(ref string) (*asset.Asset, *render.Mesh, *render.Mesh) {
-		if ref == "" {
-			return nil, nil, nil
-		}
-		a, ok := assets[ref]
-		if ok {
-			return a, meshes[ref], glows[ref]
-		}
-		a, err := filoio.LoadAssetFS(content, dir, ref)
-		if err != nil {
-			a = nil
-		}
-		var m, gm *render.Mesh
-		if a != nil {
-			m = render.BuildLayersMesh(a.Layers)
-			gm = render.BuildGlowMesh(a.Layers)
-		}
-		assets[ref] = a
-		meshes[ref] = m
-		glows[ref] = gm
-		return a, m, gm
+		return loadCachedAsset(content, dir, ref) // session cache: shared across every world rebuild
 	}
 
 	var es []entity
