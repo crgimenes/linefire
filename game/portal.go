@@ -96,6 +96,7 @@ func (g *Game) enterMap(lvl *level.Level, name, label string, simple bool) {
 	sfx, feed := g.sfx, g.log
 	from := g.mapName // where a "return" resolution goes back to
 
+	g.releaseTransientImages()
 	*g = *newWithContent(g.content, g.player, lvl, mapDir, simple)
 
 	g.health, g.shield, g.lives, g.score = health, shield, lives, score

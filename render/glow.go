@@ -81,11 +81,33 @@ type Glow struct {
 	bw, bh   int           // blur buffer size (downscaled)
 	emissive *ebiten.Image // full-res bright sources
 	a, b     *ebiten.Image // half-res ping-pong for the separable blur
+
+	// Reused per-pass draw state: a bloom runs four separable passes per frame
+	// per Glow, and building a fresh options struct + uniforms map + direction
+	// slice for each one put every pass on the heap. Ebiten serializes uniform
+	// values at call time, so mutating the shared slice between passes is safe.
+	blurDir      []float32
+	blurUniforms map[string]any
+	blurOp       ebiten.DrawRectShaderOptions
 }
 
 // NewGlow returns an empty glow renderer; buffers are created on first use.
 func NewGlow() *Glow {
 	return &Glow{}
+}
+
+// Deallocate returns the offscreen buffers' textures to the GPU immediately —
+// otherwise they wait on Go FINALIZERS, which lag far behind on wasm (the iOS
+// tab-kill ratchet). The Glow stays usable: the next Bloom recreates them.
+func (g *Glow) Deallocate() {
+	if g == nil || g.emissive == nil {
+		return
+	}
+	g.emissive.Deallocate()
+	g.a.Deallocate()
+	g.b.Deallocate()
+	g.emissive, g.a, g.b = nil, nil, nil
+	g.w, g.h = 0, 0
 }
 
 func (g *Glow) ensure(w, h int) {
@@ -194,10 +216,14 @@ func (g *Glow) bloomPass(dst *ebiten.Image, shader *ebiten.Shader, geo ebiten.Ge
 // blur-buffer resolution.
 func (g *Glow) blur(dst, src *ebiten.Image, shader *ebiten.Shader, dx, dy float64) {
 	dst.Clear()
-	op := &ebiten.DrawRectShaderOptions{}
-	op.Images[0] = src
-	op.Uniforms = map[string]any{"Direction": []float32{float32(dx), float32(dy)}}
-	dst.DrawRectShader(g.bw, g.bh, shader, op)
+	if g.blurDir == nil {
+		g.blurDir = make([]float32, 2)
+		g.blurUniforms = map[string]any{"Direction": g.blurDir}
+	}
+	g.blurDir[0], g.blurDir[1] = float32(dx), float32(dy)
+	g.blurOp.Images[0] = src
+	g.blurOp.Uniforms = g.blurUniforms
+	dst.DrawRectShader(g.bw, g.bh, shader, &g.blurOp)
 }
 
 // drawEmissive draws every visible layer's strokes scaled by the layer glow and
