@@ -302,32 +302,73 @@ func (g *Game) ensureFogTex() {
 	g.rehydrateFogTex()
 }
 
+// fogRehydrateRes is the re-hydration mask's resolution, in texels per discovery
+// cell axis. The mask is the binary seen grid sampled BILINEARLY and thresholded
+// at the 0.5 iso-contour, so the boundary between seen and fogged runs straight
+// between cell centers instead of stair-stepping along cell blocks; the final
+// linear upscale to the fog texture then only has ~cell/res world units of
+// feather to add. 8 leaves ~4 device px of edge softness at the native scale —
+// close to the stamped polygons — for a mask a few hundred KB big, built once
+// per map entry.
+const fogRehydrateRes = 8
+
 // rehydrateFogTex re-paints the cleared texture from the discovery grid — the
-// few-KB truth that survives map changes and checkpoints. One cell-resolution
-// mask upscaled through the linear filter: the fog edge comes back a little
-// coarser than the stamped polygons and refines again as the ship flies.
+// few-KB truth that survives map changes and checkpoints. The edge comes back
+// slightly softer than the stamped polygons and refines again as the ship flies.
 func (g *Game) rehydrateFogTex() {
 	d := g.disc
 	if d == nil {
 		return
 	}
-	pix := make([]byte, d.cols*d.rows*4)
 	seenAny := false
-	for i, s := range d.seen {
-		if !s {
-			continue
+	for _, s := range d.seen {
+		if s {
+			seenAny = true
+			break
 		}
-		seenAny = true
-		p := i * 4
-		pix[p], pix[p+1], pix[p+2], pix[p+3] = 0xff, 0xff, 0xff, 0xff
 	}
 	if !seenAny {
 		return // a fresh map: nothing to restore
 	}
-	mask := ebiten.NewImage(d.cols, d.rows)
+
+	seenAt := func(cx, cy int) float64 { // clamped: border cells extend outward
+		cx = min(max(cx, 0), d.cols-1)
+		cy = min(max(cy, 0), d.rows-1)
+		if d.seen[cy*d.cols+cx] {
+			return 1
+		}
+		return 0
+	}
+
+	const res = fogRehydrateRes
+	w, h := d.cols*res, d.rows*res
+	pix := make([]byte, w*h*4)
+	for y := range h {
+		cy := (float64(y)+0.5)/res - 0.5
+		y0 := int(math.Floor(cy))
+		fy := cy - float64(y0)
+		for x := range w {
+			cx := (float64(x)+0.5)/res - 0.5
+			x0 := int(math.Floor(cx))
+			fx := cx - float64(x0)
+			s00, s10 := seenAt(x0, y0), seenAt(x0+1, y0)
+			s01, s11 := seenAt(x0, y0+1), seenAt(x0+1, y0+1)
+			if s00 == s10 && s00 == s01 && s00 == s11 { // uniform neighborhood: no contour here
+				if s00 == 0 {
+					continue
+				}
+			} else if lerp(lerp(s00, s10, fx), lerp(s01, s11, fx), fy) < 0.5 {
+				continue
+			}
+			p := (y*w + x) * 4
+			pix[p], pix[p+1], pix[p+2], pix[p+3] = 0xff, 0xff, 0xff, 0xff
+		}
+	}
+
+	mask := ebiten.NewImage(w, h)
 	mask.WritePixels(pix)
 	var op ebiten.DrawImageOptions
-	op.GeoM.Scale(d.cell*fogTexScale, d.cell*fogTexScale) // cell -> fog texels (both grids share the map origin)
+	op.GeoM.Scale(d.cell*fogTexScale/res, d.cell*fogTexScale/res) // mask texel -> fog texels (both grids share the map origin)
 	op.Filter = ebiten.FilterLinear
 	g.fogTex.DrawImage(mask, &op)
 	mask.Deallocate()
