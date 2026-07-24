@@ -15,7 +15,7 @@ require (
 	github.com/ebitengine/gomobile v0.0.0-20260211053922-3d992dae95d1 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
 	github.com/ebitengine/oto/v3 v3.5.0-alpha.8 // indirect
-	github.com/ebitengine/purego v0.11.0-alpha.7 // indirect
+	github.com/ebitengine/purego v0.11.0-alpha.8 // indirect
 	github.com/go-text/typesetting v0.3.5-0.20260505125104-04e4e76f9371 // indirect
 	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/jfreymuth/pulse v0.1.2 // indirect
