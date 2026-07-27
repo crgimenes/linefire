@@ -77,16 +77,33 @@ func buildAlphaTex(w, h int, dist func(x, y float64) float64) *ebiten.Image {
 
 // fillCircle draws a tinted disc of radius r (device px) centered at (cx, cy).
 func fillCircle(dst *ebiten.Image, cx, cy, r float64, col color.RGBA) {
+	disc(dst, cx, cy, r, col, 1, ebiten.Blend{})
+}
+
+// fillCircleAdd is fillCircle with ADDITIVE blending, scaled by gain — the same
+// light-adding draw the bolts use. Note that a caller fades an additive mark with
+// gain, NOT with the color's alpha: additive blending ignores the destination, so
+// a lower alpha alone would leave the mark just as bright.
+func fillCircleAdd(dst *ebiten.Image, cx, cy, r float64, col color.RGBA, gain float64) {
+	disc(dst, cx, cy, r, col, gain, ebiten.BlendLighter)
+}
+
+// disc is the shared body behind both: one tinted, scaled quad of the disc sprite.
+func disc(dst *ebiten.Image, cx, cy, r float64, col color.RGBA, gain float64, blend ebiten.Blend) {
 	if r <= 0 {
 		return
 	}
 	buildSprites()
 	s := r / discTexR
-	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterLinear}
+	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterLinear, Blend: blend}
 	op.GeoM.Translate(-(discTexR + spritePad), -(discTexR + spritePad))
 	op.GeoM.Scale(s, s)
 	op.GeoM.Translate(cx, cy)
 	op.ColorScale.ScaleWithColor(col)
+	if gain != 1 {
+		f := float32(gain)
+		op.ColorScale.Scale(f, f, f, f)
+	}
 	dst.DrawImage(discTex, op)
 }
 

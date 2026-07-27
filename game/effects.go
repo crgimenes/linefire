@@ -26,16 +26,19 @@ const (
 
 	dotGlowScale = 1.8 // dot radius multiplier in the emissive pass (softer bloom)
 
-	// Thruster exhaust: a sparse plume trailed from the ship's rear each frame
-	// it accelerates, so the counts stay small (the pool cap is the backstop).
-	thrusterPerFrame = 2
-	thrusterSpeedMin = 1.0
-	thrusterSpeedMax = 2.6
-	thrusterSpread   = 0.7 // sideways fan as a fraction of the backward speed
-	thrusterLifeMin  = 8
-	thrusterLifeMax  = 16
-	thrusterDrag     = 0.86
-	thrusterSize     = 1.1 // dot radius, world units
+	// Thruster exhaust: a sparse plume trailed from the ship's rear each frame it
+	// accelerates, so the counts stay small (the pool cap is the backstop). It is cut
+	// from the afterburner's pattern (emitBoostFlame): a NARROW fan of STREAKS thrown
+	// fast out the tail, just shorter and cooler than the boost so Shift still reads
+	// as a step up. Fat discs were the wrong shape entirely — they smear a blob over
+	// the hull instead of a jet, and idle blue ends up burying the boost's orange.
+	thrusterPerFrame = 3
+	thrusterSpeedMin = 2.4
+	thrusterSpeedMax = 4.6
+	thrusterSpread   = 0.22 // narrow fan, like the afterburner's
+	thrusterLifeMin  = 10
+	thrusterLifeMax  = 20
+	thrusterDrag     = 0.90
 )
 
 var (
@@ -231,9 +234,8 @@ func (g *Game) emitThruster(fx, fy float64) {
 			drag:    thrusterDrag,
 			life:    life,
 			maxLife: life,
-			size:    thrusterSize,
 			col:     thrusterColor,
-			style:   styleDot,
+			style:   styleStreak,
 		})
 	}
 }
@@ -260,6 +262,12 @@ func (g *Game) stepParticles() {
 
 // drawParticles renders the pool, fading each particle with its remaining life.
 // glow widens streaks and discs so the same pool feeds the bloom buffer too.
+//
+// Every particle here is LIGHT — engine exhaust, sparks, embers, pickup motes — so
+// they ADD to the scene like the bolts do (and like kutta composites its smoke)
+// instead of painting over it. The remaining life drives the additive gain rather
+// than the color's alpha: additive blending ignores what is under it, so fading
+// the alpha alone would leave a dying spark just as bright as a fresh one.
 func (g *Game) drawParticles(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 	streakW := sparkWidth
 	sizeScale := 1.0
@@ -270,19 +278,17 @@ func (g *Game) drawParticles(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 	for i := range g.particles {
 		p := &g.particles[i]
 		frac := float64(p.life) / float64(p.maxLife)
-		c := p.col
-		c.A = uint8(float64(p.col.A) * frac)
 		if p.style == styleDot {
 			cx, cy := cam.Apply(p.x, p.y)
 			r := p.size * g.camPixelScale() * sizeScale * frac
 			if r < 0.5*g.dpr {
 				r = 0.5 * g.dpr // keep a visible speck until it fades out
 			}
-			fillCircle(dst, cx, cy, r, c)
+			fillCircleAdd(dst, cx, cy, r, p.col, frac)
 			continue
 		}
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
-		strokeLine(dst, x0, y0, x1, y1, streakW*g.dpr, c)
+		strokeLineAdd(dst, x0, y0, x1, y1, streakW*g.dpr, p.col, frac)
 	}
 }
