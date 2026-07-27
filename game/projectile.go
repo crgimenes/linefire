@@ -23,8 +23,10 @@ const (
 	// lays the soft outer glow on top). Bolts used to be a flat painted line that
 	// the rock swallowed; adding light instead — kutta's smoke trick — makes them
 	// read against any background without turning up the bloom for the whole scene.
-	boltHaloWidth = 3.2  // halo stroke as a multiple of the core width
-	boltHaloGain  = 0.30 // how much of the halo color each bolt adds
+	boltHaloWidth  = 3.2 // halo stroke as a multiple of the core width
+	boltHaloGain   = 0.3 // how much of the halo color each bolt adds
+	boltTrailSteps = 4   // wake segments dragged behind the bolt, each thinner and dimmer
+	boltTrailSpan  = 1.6 // travel each wake segment spans, in frames (a frame's step is tiny)
 
 	// Direct-hit impact effect (impactBurst), scaled by the shot's damage so a
 	// bullet is a small spark and a heavier round is punchier — the missile blast's
@@ -312,11 +314,27 @@ func (g *Game) bulletHitsEnemy(ax, ay, bx, by float64) int {
 	return -1
 }
 
+// boltTrail drags a wake behind a bolt: the frame's travel segment repeated back
+// down its own path, each step thinner and dimmer, so the shot reads as light
+// fading out behind it instead of a mark that stops dead at its tail. It is the
+// same additive light as the halo — the wake IS the glow, smeared along the path —
+// so it needs no particles and nothing to simulate.
+func (g *Game) boltTrail(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA, gain float64) {
+	dx := (x0 - x1) * boltTrailSpan // travel pointing back down the path
+	dy := (y0 - y1) * boltTrailSpan
+	for i := range boltTrailSteps {
+		f := 1 - float64(i)/boltTrailSteps // full behind the bolt, fading to nothing at the tail
+		ax, ay := x0+dx*float64(i), y0+dy*float64(i)
+		strokeLineAdd(dst, ax, ay, ax+dx, ay+dy, width*f*g.dpr, col, gain*f)
+	}
+}
+
 // drawBolt draws one projectile streak the way kutta composites its glowing smoke:
 // a wide dim halo with the bright core added over it, both ADDING light rather
-// than painting over the world. The bloom pass then lays the soft outer halo on
-// top of that.
+// than painting over the world, trailing a short wake. The bloom pass then lays
+// the soft outer halo on top of that.
 func (g *Game) drawBolt(dst *ebiten.Image, x0, y0, x1, y1, width float64, core, halo color.RGBA) {
+	g.boltTrail(dst, x0, y0, x1, y1, width*boltHaloWidth, halo, boltHaloGain)
 	strokeLineAdd(dst, x0, y0, x1, y1, width*boltHaloWidth*g.dpr, halo, boltHaloGain)
 	strokeLineAdd(dst, x0, y0, x1, y1, width*g.dpr, core, 1)
 }
@@ -330,6 +348,7 @@ func (g *Game) drawEnemyShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
 		if glow {
+			g.boltTrail(dst, x0, y0, x1, y1, bulletGlowWidth, enemyShotGlowColor, 1)
 			strokeLine(dst, x0, y0, x1, y1, bulletGlowWidth*g.dpr, enemyShotGlowColor)
 			continue
 		}
@@ -346,6 +365,7 @@ func (g *Game) drawShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
 		if glow {
+			g.boltTrail(dst, x0, y0, x1, y1, p.glowW, p.rglow, 1)
 			strokeLine(dst, x0, y0, x1, y1, p.glowW*g.dpr, p.rglow)
 			continue
 		}
