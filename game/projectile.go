@@ -19,6 +19,13 @@ const (
 	bulletGlowWidth = 3.2 // wider emissive stroke feeding the bloom
 	bulletHitRadius = 2.0 // world units; bullet-vs-wall collision tolerance
 
+	// The bolt's own halo, added under the core in the crisp pass (the bloom still
+	// lays the soft outer glow on top). Bolts used to be a flat painted line that
+	// the rock swallowed; adding light instead — kutta's smoke trick — makes them
+	// read against any background without turning up the bloom for the whole scene.
+	boltHaloWidth = 3.2  // halo stroke as a multiple of the core width
+	boltHaloGain  = 0.30 // how much of the halo color each bolt adds
+
 	// Direct-hit impact effect (impactBurst), scaled by the shot's damage so a
 	// bullet is a small spark and a heavier round is punchier — the missile blast's
 	// small cousin, keeping the same proportions.
@@ -305,31 +312,44 @@ func (g *Game) bulletHitsEnemy(ax, ay, bx, by float64) int {
 	return -1
 }
 
-// drawProjectiles draws each bullet in shots as a streak from its previous to
-// its current position, through the camera, in the given color and width. Used for
-// the enemy shots, which all share one look.
-func (g *Game) drawProjectiles(dst *ebiten.Image, cam ebiten.GeoM, shots []projectile, col color.RGBA, width float64) {
-	for i := range shots {
-		p := &shots[i]
+// drawBolt draws one projectile streak the way kutta composites its glowing smoke:
+// a wide dim halo with the bright core added over it, both ADDING light rather
+// than painting over the world. The bloom pass then lays the soft outer halo on
+// top of that.
+func (g *Game) drawBolt(dst *ebiten.Image, x0, y0, x1, y1, width float64, core, halo color.RGBA) {
+	strokeLineAdd(dst, x0, y0, x1, y1, width*boltHaloWidth*g.dpr, halo, boltHaloGain)
+	strokeLineAdd(dst, x0, y0, x1, y1, width*g.dpr, core, 1)
+}
+
+// drawEnemyShots draws the enemy bullet pool as streaks from each shot's previous
+// to its current position. glow selects the wider, softer stroke that feeds the
+// bloom instead of the bolt itself.
+func (g *Game) drawEnemyShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
+	for i := range g.enemyShots {
+		p := &g.enemyShots[i]
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
-		strokeLine(dst, x0, y0, x1, y1, width*g.dpr, col)
+		if glow {
+			strokeLine(dst, x0, y0, x1, y1, bulletGlowWidth*g.dpr, enemyShotGlowColor)
+			continue
+		}
+		g.drawBolt(dst, x0, y0, x1, y1, bulletWidth, enemyShotColor, enemyShotGlowColor)
 	}
 }
 
 // drawShots draws the player projectile pool, each bullet in its own weapon's
 // color and width (so one pool can carry shots from every equipped weapon). glow
-// selects the wider, softer stroke that feeds the bloom.
+// selects the wider, softer stroke that feeds the bloom instead of the bolt itself.
 func (g *Game) drawShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 	for i := range g.projectiles {
 		p := &g.projectiles[i]
-		col, w := p.rcol, p.width
-		if glow {
-			col, w = p.rglow, p.glowW
-		}
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
-		strokeLine(dst, x0, y0, x1, y1, w*g.dpr, col)
+		if glow {
+			strokeLine(dst, x0, y0, x1, y1, p.glowW*g.dpr, p.rglow)
+			continue
+		}
+		g.drawBolt(dst, x0, y0, x1, y1, p.width, p.rcol, p.rglow)
 	}
 }
 

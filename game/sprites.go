@@ -93,17 +93,35 @@ func fillCircle(dst *ebiten.Image, cx, cy, r float64, col color.RGBA) {
 // strokeLine draws a tinted straight streak of the given width (device px) from
 // (x0, y0) to (x1, y1), butt-capped like the vector StrokeLine it replaces.
 func strokeLine(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA) {
+	streak(dst, x0, y0, x1, y1, width, col, 1, ebiten.Blend{})
+}
+
+// strokeLineAdd is strokeLine with ADDITIVE blending, scaled by gain: the streak
+// adds light to whatever lies under it instead of covering it. That is how kutta
+// composites its glowing smoke, and it is what makes a mark read as hot — the
+// same stroke drawn over-and-over blows out to white where it overlaps.
+func strokeLineAdd(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA, gain float64) {
+	streak(dst, x0, y0, x1, y1, width, col, gain, ebiten.BlendLighter)
+}
+
+// streak is the shared body behind both: one tinted, transformed quad of the line
+// sprite.
+func streak(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA, gain float64, blend ebiten.Blend) {
 	dx, dy := x1-x0, y1-y0
 	length := math.Hypot(dx, dy)
 	if length == 0 || width <= 0 {
 		return
 	}
 	buildSprites()
-	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterLinear}
+	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterLinear, Blend: blend}
 	op.GeoM.Translate(-spritePad, -spritePad-lineTexW/2) // origin at the bar's start, on its axis
 	op.GeoM.Scale(length/lineTexL, width/lineTexW)
 	op.GeoM.Rotate(math.Atan2(dy, dx))
 	op.GeoM.Translate(x0, y0)
 	op.ColorScale.ScaleWithColor(col)
+	if gain != 1 {
+		f := float32(gain)
+		op.ColorScale.Scale(f, f, f, f)
+	}
 	dst.DrawImage(lineTex, op)
 }
