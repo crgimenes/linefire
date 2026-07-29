@@ -4,6 +4,8 @@
 // projectile or power-up.
 package asset
 
+import "math"
+
 // DefaultFileName is where the asset editor saves when it was started without a path.
 const DefaultFileName = "linefire_asset.lfa"
 
@@ -185,6 +187,41 @@ func (a *Asset) Radius() float64 {
 		}
 	}
 	return DefaultRadius
+}
+
+// DrawRadius is how far the drawn geometry actually reaches from the origin: the
+// furthest point of any visible path, control points included.
+//
+// It is not Radius. Radius is the HITBOX, which is deliberately generous — a
+// power-up's is nearly twice the size of the icon on it so it is easy to fly
+// into. Anything meant to hug what is DRAWN — a ring around a pickup, a
+// highlight — wants this instead, or it sits far outside the shape it is
+// supposed to be marking. Falls back to Radius when there is nothing drawn.
+func (a *Asset) DrawRadius() float64 {
+	if a == nil {
+		return DefaultRadius
+	}
+	reach := 0.0
+	for _, l := range a.Layers {
+		if l.Hidden {
+			continue
+		}
+		for _, path := range l.Paths {
+			for _, c := range path.Commands {
+				if c.Op == OpClose {
+					continue
+				}
+				reach = max(reach, math.Hypot(c.X-a.Origin.X, c.Y-a.Origin.Y))
+				for _, ctrl := range c.Ctrl {
+					reach = max(reach, math.Hypot(ctrl.X-a.Origin.X, ctrl.Y-a.Origin.Y))
+				}
+			}
+		}
+	}
+	if reach == 0 {
+		return a.Radius()
+	}
+	return reach
 }
 
 // New returns an empty asset with sensible defaults: a 64x64 box, a centered
