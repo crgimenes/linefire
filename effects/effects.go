@@ -32,12 +32,22 @@ const (
 	streakGlowWidth = 3.0 // wider emissive streak feeding the bloom
 	dotGlowScale    = 1.8 // dot radius multiplier in the emissive pass (softer bloom)
 	minDotRadius    = 0.5 // logical px: keep a visible speck until it fades out
+
+	// Engine exhaust, trailed once per accelerating frame, so the counts stay small.
+	thrusterPerFrame = 3
+	thrusterSpeedMin = 2.4
+	thrusterSpeedMax = 4.6
+	thrusterSpread   = 0.22 // narrow fan
+	thrusterLifeMin  = 10
+	thrusterLifeMax  = 20
+	thrusterDrag     = 0.90
 )
 
 // Colors shared by the presets below.
 var (
-	SparkColor  = color.RGBA{0xff, 0xc8, 0x60, 0xff} // warm explosion core
-	DebrisColor = color.RGBA{0xff, 0x90, 0x40, 0xff} // hotter ember chunks
+	SparkColor    = color.RGBA{0xff, 0xc8, 0x60, 0xff} // warm explosion core
+	DebrisColor   = color.RGBA{0xff, 0x90, 0x40, 0xff} // hotter ember chunks
+	ThrusterColor = color.RGBA{0x90, 0xe0, 0xff, 0xff} // pale blue engine exhaust
 )
 
 // ExplosionStreaks and ExplosionChunks together are a ship dying: warm streaks
@@ -148,6 +158,31 @@ func (p *Pool) Burst(x, y float64, b Burst) {
 func (p *Pool) Explosion(x, y float64) {
 	p.Burst(x, y, ExplosionStreaks)
 	p.Burst(x, y, ExplosionChunks)
+}
+
+// Thruster trails exhaust from (x, y) — the ship's rear — for one frame of
+// acceleration along the forward unit vector (fx, fy). Call it once per thrusting
+// frame; the counts are small because of that, and the pool cap is the backstop.
+//
+// The plume is a NARROW fan of streaks thrown fast out the tail. Fat discs were
+// the wrong shape entirely: they smear a blob over the hull instead of a jet.
+func (p *Pool) Thruster(x, y, fx, fy float64) {
+	sx, sy := -fy, fx // the forward vector turned 90°, for the lateral spread
+	for range thrusterPerFrame {
+		speed := thrusterSpeedMin + p.random()*(thrusterSpeedMax-thrusterSpeedMin)
+		fan := (p.random()*2 - 1) * thrusterSpread * speed
+		life := thrusterLifeMin + p.intn(thrusterLifeMax-thrusterLifeMin+1)
+		p.Emit(Particle{
+			X: x, Y: y,
+			VX:      -fx*speed + sx*fan,
+			VY:      -fy*speed + sy*fan,
+			Drag:    thrusterDrag,
+			Life:    life,
+			MaxLife: life,
+			Col:     ThrusterColor,
+			Style:   StyleStreak,
+		})
+	}
 }
 
 // Step advances and ages every particle, dropping the dead ones. Pure motion, no

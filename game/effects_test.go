@@ -38,8 +38,10 @@ func TestThrusterEmitsBehindShip(t *testing.T) {
 	g.x, g.y, g.radius = 100, 50, 8
 	g.emitThruster(1, 0) // facing +x, so exhaust starts at the rear and moves -x
 
-	if g.fxPool().Len() != thrusterPerFrame {
-		t.Fatalf("thruster particles = %d, want %d", g.fxPool().Len(), thrusterPerFrame)
+	// How sparse the plume is belongs to the effects package; what this test owns
+	// is that the game aims it out of the ship's tail.
+	if g.fxPool().Len() == 0 {
+		t.Fatal("thrusting emitted no exhaust")
 	}
 	for _, p := range g.fxPool().Particles() {
 		if p.X > g.x {

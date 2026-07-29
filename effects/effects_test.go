@@ -1,6 +1,9 @@
 package effects
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // fixedRandom returns a source cycling through the given values, so a test can
 // pin exactly what a burst comes out as.
@@ -63,6 +66,28 @@ func TestStepMovesAndRetiresParticles(t *testing.T) {
 	p.Step()
 	if p.Len() != 0 {
 		t.Fatalf("a particle with 2 frames of life survived 2 steps: %d left", p.Len())
+	}
+}
+
+// The plume is a narrow fan thrown out the tail, so every particle has to leave
+// against the forward vector rather than spraying around the hull.
+func TestThrusterThrowsExhaustBackwards(t *testing.T) {
+	p := New(DefaultMax, fixedRandom(0, 0.25, 0.5, 0.75, 0.999))
+	p.Thruster(10, 20, 1, 0) // pointing +X
+
+	if p.Len() != thrusterPerFrame {
+		t.Fatalf("one thrusting frame emitted %d particles, want %d", p.Len(), thrusterPerFrame)
+	}
+	for _, pt := range p.Particles() {
+		if pt.X != 10 || pt.Y != 20 {
+			t.Errorf("exhaust started at %.1f,%.1f, want the emission point", pt.X, pt.Y)
+		}
+		if pt.VX >= 0 {
+			t.Errorf("exhaust moving forward: vx %.2f", pt.VX)
+		}
+		if spread := math.Abs(pt.VY / pt.VX); spread > thrusterSpread {
+			t.Errorf("exhaust fanned out by %.2f, wider than the %.2f spread", spread, thrusterSpread)
+		}
 	}
 }
 

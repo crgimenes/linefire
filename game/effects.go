@@ -13,19 +13,6 @@ import (
 const (
 	muzzleFlashFrames = 4 // how long the muzzle flash lingers
 
-	// Thruster exhaust: a sparse plume trailed from the ship's rear each frame it
-	// accelerates, so the counts stay small (the pool cap is the backstop). It is cut
-	// from the afterburner's pattern (emitBoostFlame): a NARROW fan of STREAKS thrown
-	// fast out the tail, just shorter and cooler than the boost so Shift still reads
-	// as a step up. Fat discs were the wrong shape entirely — they smear a blob over
-	// the hull instead of a jet, and idle blue ends up burying the boost's orange.
-	thrusterPerFrame = 3
-	thrusterSpeedMin = 2.4
-	thrusterSpeedMax = 4.6
-	thrusterSpread   = 0.22 // narrow fan, like the afterburner's
-	thrusterLifeMin  = 10
-	thrusterLifeMax  = 20
-	thrusterDrag     = 0.90
 )
 
 var (
@@ -34,7 +21,6 @@ var (
 	muzzleColor      = color.RGBA{0xe8, 0xff, 0xff, 0xff} // bright muzzle flash
 	wallSparkColor   = color.RGBA{0xc0, 0xff, 0xff, 0xff} // wallSparks default, for a caller with no shot color to pass
 	shieldSparkColor = color.RGBA{0x80, 0xff, 0xff, 0xff} // cyan shield deflection
-	thrusterColor    = color.RGBA{0x90, 0xe0, 0xff, 0xff} // pale blue engine exhaust
 )
 
 // addShake bumps the screen-shake magnitude, taking the max so a fresh jolt is
@@ -147,28 +133,10 @@ func (g *Game) emitExplosion(x, y float64) {
 }
 
 // emitThruster trails exhaust from the ship's rear while it accelerates along the
-// forward unit vector (fx, fy). Called once per thrust frame, so it stays sparse.
-// The plume shoots backward with a small sideways fan; (px, py) is (fx, fy) turned
-// 90° for that lateral spread.
+// forward unit vector (fx, fy). The plume is the package's, so the afterburner's
+// little sibling looks the same wherever a ship burns fuel.
 func (g *Game) emitThruster(fx, fy float64) {
-	rearX := g.x - fx*g.radius
-	rearY := g.y - fy*g.radius
-	px, py := -fy, fx
-	for range thrusterPerFrame {
-		speed := thrusterSpeedMin + randFloat()*(thrusterSpeedMax-thrusterSpeedMin)
-		fan := (randFloat()*2 - 1) * thrusterSpread * speed
-		life := thrusterLifeMin + randIntN(thrusterLifeMax-thrusterLifeMin+1)
-		g.emit(effects.Particle{
-			X: rearX, Y: rearY,
-			VX:      -fx*speed + px*fan,
-			VY:      -fy*speed + py*fan,
-			Drag:    thrusterDrag,
-			Life:    life,
-			MaxLife: life,
-			Col:     thrusterColor,
-			Style:   effects.StyleStreak,
-		})
-	}
+	g.fxPool().Thruster(g.x-fx*g.radius, g.y-fy*g.radius, fx, fy)
 }
 
 // stepParticles advances and ages every particle, dropping the dead ones.

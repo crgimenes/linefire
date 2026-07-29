@@ -1370,52 +1370,22 @@ func (g *Game) drawEntity(dst *ebiten.Image, cam ebiten.GeoM, e *entity, camX, c
 	}
 }
 
-const (
-	portalMotes = 72  // particles converging on the vortex
-	portalSpeed = 0.6 // how fast a particle travels rim -> centre (cycles per second)
-)
-
-// drawPortal renders a portal as a tunnel: a thin outer ring, and particles born ON that ring
-// that travel STRAIGHT to the centre and die there — nothing else. The radial convergence (no
-// spiral, no inner rings) reads as looking down a tunnel. Each particle takes a fresh random
-// spoke every cycle, so the stream scatters instead of tracing thick arms. The accent colour
-// comes from portalStyle, so an authored-stage portal and a bonus/procedural one are told apart.
+// drawPortal renders a portal with the shared vortex: a thin outer ring and motes
+// falling straight down it to the centre. The accent colour comes from
+// portalStyle, so an authored-stage portal and a bonus/procedural one are told
+// apart.
 func (g *Game) drawPortal(dst *ebiten.Image, cam ebiten.GeoM, e *entity) {
 	col, _ := portalStyle(e.target)
 	mx, my := cam.Apply(e.x, e.y)
-	cx, cy := float32(mx), float32(my)
 	sc := g.camPixelScale()
-	rMax := (e.radius + 12) * sc
-	t := float64(ebiten.Tick()) / float64(ebiten.TPS())
-
-	// Thin outer ring: where the particles are born.
-	ring := col
-	ring.A = uint8(0x70 + 0x80*(0.5+0.5*math.Sin(t*3)))
-	vector.StrokeCircle(dst, cx, cy, float32(rMax), float32(1.4*g.dpr), ring, true)
-
-	for i := range portalMotes {
-		p := t*portalSpeed + float64(i)/portalMotes
-		cycle := math.Floor(p)
-		u := 1 - (p - cycle) // 1 at the rim, 0 at the centre
-		ang := portalAngle(i, int(cycle))
-		rr := rMax * u
-		px := cx + float32(rr*math.Cos(ang))
-		py := cy + float32(rr*math.Sin(ang))
-		a := math.Sin(math.Pi * u) // fade in at the rim, out at the centre
-		mc := col
-		mc.A = uint8(235 * a)
-		render.FillCircle(dst, float64(px), float64(py), 1.6*sc, mc)
-	}
-}
-
-// portalAngle is a stable pseudo-random spoke direction for particle i on cycle c: constant
-// while a particle falls inward, fresh when it respawns, so the stream never repeats a fixed arm.
-func portalAngle(i, c int) float64 {
-	h := uint32(i)*73856093 ^ uint32(c)*19349663 // #nosec G115 -- small non-negative indices; the hash mixing is intentional
-	h ^= h >> 13
-	h *= 0x85ebca6b
-	h ^= h >> 16
-	return float64(h) / float64(1<<32) * 2 * math.Pi
+	effects.DrawPortal(dst, effects.Portal{
+		X: mx, Y: my,
+		Radius:  (e.radius + 12) * sc,
+		Col:     col,
+		Seconds: float64(ebiten.Tick()) / float64(ebiten.TPS()),
+		DPR:     g.dpr,
+		Scale:   sc,
+	})
 }
 
 // drawPulseRing draws a pulsing ring around an entity so it draws the eye, in the

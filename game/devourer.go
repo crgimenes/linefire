@@ -307,7 +307,7 @@ func (g *Game) drawDevourer(dst *ebiten.Image, cam ebiten.GeoM) {
 	for i := range motes {
 		p := t*devourerSpeed + float64(i)/float64(devourerMotes)
 		u := 1 - (p - math.Floor(p)) // 1 at rim, 0 at core
-		ang := portalAngle(i, int(math.Floor(p)))
+		ang := effects.SpokeAngle(i, int(math.Floor(p)))
 		rr := float64(rMax) * u
 		px := cx + float32(rr*math.Cos(ang))
 		py := cy + float32(rr*math.Sin(ang))
