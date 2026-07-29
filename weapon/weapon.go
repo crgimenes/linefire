@@ -54,6 +54,13 @@ type Weapon struct {
 	Col    color.RGBA // floating damage-number colour
 	Fire   Sound
 
+	// Energy is what one use costs, drawn from the ship's pool. Zero is free, and
+	// exactly one weapon is: the front gun. A ship that has run dry can still
+	// shoot — it just cannot reach for anything heavier, which is the point.
+	// Harder-hitting weapons cost more, so the pool is a budget over which weapon
+	// to spend a fight on rather than a timer on shooting at all.
+	Energy int
+
 	// Projectile.
 	Speed     float64
 	Life      int
@@ -86,16 +93,18 @@ var Catalog = []Weapon{
 	CatFront: {
 		Name: "Front Gun", Kind: KindProjectile, Aim: AimForward, Cooldown: 8,
 		Damage: 1, Col: color.RGBA{0xff, 0xf0, 0xc0, 0xff},
-		Fire:  Sound{"shot_soft", 101, 0.3}, // low, dark pu — bursty, kept quiet so it will not mask the music
-		Speed: 9.0, Life: 90,
+		Fire:   Sound{"shot_soft", 101, 0.3}, // low, dark pu — bursty, kept quiet so it will not mask the music
+		Energy: 0,                            // the weapon that always works
+		Speed:  9.0, Life: 90,
 		Core: color.RGBA{0xe8, 0xff, 0xff, 0xff}, Glow: color.RGBA{0x80, 0xff, 0xff, 0xff},
 		Width: 1.6, GlowWidth: 2.0,
 	},
 	CatMissile: {
 		Name: "Missile", Kind: KindProjectile, Aim: AimCursor, Cooldown: 45,
 		Damage: 4, Col: color.RGBA{0xff, 0xa0, 0x40, 0xff},
-		Fire:  Sound{"shot_launch", 130, 0.5}, // low rising launch whoosh
-		Speed: 7.0, Life: 110, AOE: 70.0,
+		Fire:   Sound{"shot_launch", 130, 0.5}, // low rising launch whoosh
+		Energy: 12,
+		Speed:  7.0, Life: 110, AOE: 70.0,
 		Core: color.RGBA{0xff, 0xa0, 0x40, 0xff}, Glow: color.RGBA{0xff, 0x60, 0x20, 0xff},
 		Width: 2.4, GlowWidth: 5.0,
 	},
@@ -103,13 +112,15 @@ var Catalog = []Weapon{
 		Name: "Mine", Kind: KindMine, Aim: AimDrop, Cooldown: 16, // spaces out a held deploy
 		Damage: 5, Col: color.RGBA{0xff, 0x80, 0x30, 0xff},
 		Fire:      Sound{"shot_thunk", 140, 0.45}, // dull low deploy thunk
+		Energy:    10,
 		AOE:       64.0,
 		ArmFrames: 45, TriggerRadius: 36.0, MaxLive: 5,
 	},
 	CatLaser: {
 		Name: "Laser", Kind: KindLaser, Aim: AimCursor, Cooldown: 4,
 		Damage: 1, Col: color.RGBA{0x90, 0xff, 0x90, 0xff},
-		Fire: Sound{"beam", 150, 0.3}, // a loop recipe: hums while the beam is held
+		Fire:   Sound{"beam", 150, 0.3}, // a loop recipe: hums while the beam is held
+		Energy: 1,                       // per damage tick, so a held beam drains steadily
 		// The raymarch stops at the first rock, so a long reach is cheap: this
 		// crosses the screen and lands on a wall.
 		Reach: 2000,
@@ -117,7 +128,8 @@ var Catalog = []Weapon{
 	CatDevourer: {
 		Name: "Devourer", Kind: KindDevourer, Aim: AimDrop, Cooldown: 90,
 		Damage: 300, Col: color.RGBA{0xc0, 0x40, 0xff, 0xff},
-		Fire: Sound{"shot_thunk", 70, 0.7}, // a deep, ominous drop
+		Fire:   Sound{"shot_thunk", 70, 0.7}, // a deep, ominous drop
+		Energy: 120,                          // the heaviest thing a ship can carry, priced like it
 	},
 }
 
