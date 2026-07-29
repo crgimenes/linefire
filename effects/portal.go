@@ -12,7 +12,7 @@ import (
 
 const (
 	portalMotes     = 72   // particles converging on the vortex
-	portalSpeed     = 0.6  // how fast a mote travels rim -> centre (cycles per second)
+	portalSpeed     = 0.6  // default mote travel, rim -> centre, in cycles per second
 	portalRingWidth = 1.4  // ring stroke, logical px
 	portalMoteSize  = 1.6  // mote radius, world units
 	portalRingPulse = 3.0  // ring brightness cycles per second
@@ -34,6 +34,12 @@ type Portal struct {
 	// permanent portal leaves it at 1; a transient one — a ship arriving — rides
 	// it down as the vortex closes.
 	Fade float64
+
+	// Speed is how fast a mote travels rim -> centre, in cycles per second. Zero
+	// uses the package default. A portal that stands in the world can let them
+	// drift; a brief one has to pull them all the way in before it closes, or the
+	// convergence never arrives anywhere.
+	Speed float64
 
 	// HideRing drops the rim the motes are born on, leaving only the convergence.
 	// A portal that stands in the world wants the ring — it is a place you can fly
@@ -68,8 +74,12 @@ func DrawPortal(dst *ebiten.Image, p Portal) {
 		vector.StrokeCircle(dst, float32(p.X), float32(p.Y), float32(p.Radius), float32(portalRingWidth*p.DPR), ring, true)
 	}
 
+	speed := p.Speed
+	if speed <= 0 {
+		speed = portalSpeed
+	}
 	for i := range portalMotes {
-		phase := p.Seconds*portalSpeed + float64(i)/portalMotes
+		phase := p.Seconds*speed + float64(i)/portalMotes
 		cycle := math.Floor(phase)
 		u := 1 - (phase - cycle) // 1 at the rim, 0 at the centre
 		angle := SpokeAngle(i, int(cycle))
