@@ -10,11 +10,14 @@ import (
 	"github.com/crgimenes/linefire/render"
 )
 
+// DefaultMoteSize is the radius of a portal mote in world units. It is exported
+// so a caller asking for a different one can say what it is relative to.
+const DefaultMoteSize = 1.6
+
 const (
 	portalMotes     = 72   // particles converging on the vortex
 	portalSpeed     = 0.6  // default mote travel, rim -> centre, in cycles per second
 	portalRingWidth = 1.4  // ring stroke, logical px
-	portalMoteSize  = 1.6  // mote radius, world units
 	portalRingPulse = 3.0  // ring brightness cycles per second
 	portalMoteAlpha = 235  // peak mote alpha, half way down the spoke
 	portalRingBase  = 0x70 // ring alpha floor
@@ -34,6 +37,9 @@ type Portal struct {
 	// permanent portal leaves it at 1; a transient one — a ship arriving — rides
 	// it down as the vortex closes.
 	Fade float64
+
+	// MoteSize is the radius of one mote in world units. Zero uses DefaultMoteSize.
+	MoteSize float64
 
 	// Speed is how fast a mote travels rim -> centre, in cycles per second. Zero
 	// uses the package default. A portal that stands in the world can let them
@@ -78,6 +84,10 @@ func DrawPortal(dst *ebiten.Image, p Portal) {
 	if speed <= 0 {
 		speed = portalSpeed
 	}
+	moteSize := p.MoteSize
+	if moteSize <= 0 {
+		moteSize = DefaultMoteSize
+	}
 	for i := range portalMotes {
 		phase := p.Seconds*speed + float64(i)/portalMotes
 		cycle := math.Floor(phase)
@@ -89,7 +99,7 @@ func DrawPortal(dst *ebiten.Image, p Portal) {
 		render.FillCircle(dst,
 			p.X+r*math.Cos(angle),
 			p.Y+r*math.Sin(angle),
-			portalMoteSize*p.Scale, mote)
+			moteSize*p.Scale, mote)
 	}
 }
 
