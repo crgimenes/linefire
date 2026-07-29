@@ -36,13 +36,13 @@ const (
 
 	screenW       = 800
 	screenH       = 800
-	camScale      = 0.6  // world units -> logical screen pixels (smaller = thinner lines, more world visible)
-	turnSpeed     = 3.0  // degrees per frame
-	thrust        = 0.18 // forward acceleration per frame (W/Up)
-	strafeThrust  = 0.14 // lateral acceleration per frame (Q/E strafe)
-	reverseThrust = 0.09 // backward acceleration per frame (S); ~half of thrust, so reverse tops out near half speed
-	friction      = 0.96 // velocity retained per frame
-	maxSpeed      = 6.0  // world units per frame (caps tunnelling)
+	camScale      = render.CamScale // world units -> logical screen pixels (see render.CamScale)
+	turnSpeed     = 3.0             // degrees per frame
+	thrust        = 0.18            // forward acceleration per frame (W/Up)
+	strafeThrust  = 0.14            // lateral acceleration per frame (Q/E strafe)
+	reverseThrust = 0.09            // backward acceleration per frame (S); ~half of thrust, so reverse tops out near half speed
+	friction      = 0.96            // velocity retained per frame
+	maxSpeed      = 6.0             // world units per frame (caps tunnelling)
 
 	// blurStepPx is the target on-screen travel per accumulation sub-frame: the
 	// motion-blur sample count is sized so the fastest-moving point steps at most

@@ -7,18 +7,10 @@ import (
 	"github.com/crgimenes/linefire/level"
 )
 
-// assetRadius returns an asset's collision radius from its first circle
-// collision shape, or a small default (also used for nil assets).
+// assetRadius returns an asset's collision radius. The asset package owns the
+// rule, so anything drawn around a shape is sized from the same number.
 func assetRadius(a *asset.Asset) float64 {
-	if a == nil {
-		return 6
-	}
-	for _, s := range a.Collisions {
-		if s.Kind == asset.CollisionCircle && len(s.Points) == 1 && s.Radius > 0 {
-			return s.Radius
-		}
-	}
-	return 6
+	return a.Radius()
 }
 
 // wallSegments flattens every wall path into line segments in world space.

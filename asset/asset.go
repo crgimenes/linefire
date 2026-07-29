@@ -167,6 +167,26 @@ type Asset struct {
 	Tags       []string
 }
 
+// DefaultRadius is what an asset with no circle collision is treated as: small,
+// so a shape nobody gave a hitbox is not accidentally enormous.
+const DefaultRadius = 6
+
+// Radius is the asset's collision radius, taken from its first circle collision
+// shape. It is what everything drawn around an asset should be sized from — a
+// ring, a portal, a hit test — rather than from the art's box, which includes
+// whatever margin the drawing needed.
+func (a *Asset) Radius() float64 {
+	if a == nil {
+		return DefaultRadius
+	}
+	for _, s := range a.Collisions {
+		if s.Kind == CollisionCircle && len(s.Points) == 1 && s.Radius > 0 {
+			return s.Radius
+		}
+	}
+	return DefaultRadius
+}
+
 // New returns an empty asset with sensible defaults: a 64x64 box, a centered
 // origin and a single empty "main" layer using the default neon style.
 func New() *Asset {

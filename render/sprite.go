@@ -21,6 +21,13 @@ import (
 // the bigger the draw the softer the edge — fine for glow-adjacent effects, wrong
 // for big crisp geometry (that stays on the vector path renderer).
 
+// CamScale is Linefire's world-to-logical-pixel factor: how big a world unit is
+// drawn. Every dimension in the game is authored in world units and lands on
+// screen through this, which is why the art, the rings and the hitboxes all agree
+// there. Anything drawing Linefire assets should scale by it rather than invent
+// its own factor.
+const CamScale = 0.6
+
 const (
 	discTexR      = 12.0 // disc radius in texels (image is 2*(R+pad) square)
 	lineTexL      = 24.0 // line body length in texels
