@@ -12,8 +12,8 @@ import (
 
 	"github.com/crgimenes/gion"
 
-	"linefire/filoio"
-	"linefire/sfx"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/sfx"
 )
 
 // tracksFromDir returns the ".mp3" files in dir as "<dir>/<name>" theme paths, sorted for a

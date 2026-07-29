@@ -7,8 +7,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"github.com/crgimenes/linefire/render"
 	ui "github.com/crgimenes/minigui"
-	"linefire/render"
 )
 
 // Wall color popup geometry (logical pixels), pinned to the top-left of the canvas.

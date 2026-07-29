@@ -3,7 +3,7 @@ package game
 import (
 	"fmt"
 
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 )
 
 // objectiveKind classifies a level objective.

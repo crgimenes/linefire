@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // TestGodModeBlocksDamage: iddqd makes the ship take no damage, so a tester can fly

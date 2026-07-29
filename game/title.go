@@ -8,7 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // The title screen is the game's front door: the attract demo (the same autonomous sim the credits

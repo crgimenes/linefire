@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestDiscoveryDoesNotSeeThroughWalls is the fix for fog clearing across the thin walls of

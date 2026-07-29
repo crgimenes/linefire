@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // playtest saves the open map and launches the game runtime straight onto it, so

@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestSoakHeapStable guards against gradual accumulation: crg's iOS playtest reported

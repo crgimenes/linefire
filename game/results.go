@@ -1,7 +1,7 @@
 package game
 
 import (
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // Clearing a level is a NON-BLOCKING beat: the moment every objective is met, the run

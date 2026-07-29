@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestImportSVGFileAppendsWalls: importing an SVG APPENDS its shapes to the open map's wall

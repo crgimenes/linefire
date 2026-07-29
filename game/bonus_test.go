@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestEnterBonusIsPlayable: taking a bonus portal generates a cave the player can actually

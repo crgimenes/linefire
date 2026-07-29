@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // boxLevel builds a level whose walls form a closed rectangle, with an optional

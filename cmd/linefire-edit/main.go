@@ -21,9 +21,9 @@ import (
 
 	"github.com/crgimenes/devengine/log"
 
-	"linefire/editapp"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/editapp"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 func main() {

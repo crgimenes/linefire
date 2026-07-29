@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // Track/IsMusicFile synthesis is tested in the sfx package; here we test the

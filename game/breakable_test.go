@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // breakableGame is a game with one power-up in the path of a rightward bullet.

@@ -13,9 +13,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // ChunkSize is the world-unit side length of one chunk.

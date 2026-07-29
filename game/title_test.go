@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestBuildAttractRecords: the attract records page lists the HI score and best times from the

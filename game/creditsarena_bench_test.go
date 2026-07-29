@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/filoio"
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // BenchmarkCreditsArenaSwap measures the attract backdrop regen — the synchronous

@@ -1,6 +1,6 @@
 package editor
 
-import "linefire/asset"
+import "github.com/crgimenes/linefire/asset"
 
 // commitHistory feeds the per-frame change signals to the shared history.
 // before is the asset state cloned at the start of the frame.

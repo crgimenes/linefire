@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // hordeGame is an open (wall-free) map with the given horde config, so every ring

@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 func TestShieldAbsorbsDamageThenHealth(t *testing.T) {

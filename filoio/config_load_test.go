@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/config"
+	"github.com/crgimenes/linefire/config"
 )
 
 func TestLoadMissingAndInvalidFallsBackToDefaults(t *testing.T) {

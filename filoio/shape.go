@@ -6,7 +6,7 @@ import (
 
 	"github.com/crgimenes/filo"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // The shape grammar, shared by the asset document and the level document (a level's

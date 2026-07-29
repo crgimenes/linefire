@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // TestPathSquareImportsClosedAndYDown: a square path becomes one closed wall path in the

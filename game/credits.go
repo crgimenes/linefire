@@ -6,8 +6,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"linefire/level"
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // The credits screen is the game running ITSELF (an indestructible, auto-piloted,

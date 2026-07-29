@@ -8,10 +8,10 @@ package editapp
 import (
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/editor"
-	"linefire/filoio"
-	"linefire/level"
-	"linefire/mapeditor"
+	"github.com/crgimenes/linefire/editor"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/mapeditor"
 )
 
 const (

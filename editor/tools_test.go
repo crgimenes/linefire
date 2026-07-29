@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 func TestSnapAllToGrid(t *testing.T) {

@@ -3,9 +3,9 @@ package game
 import (
 	"strings"
 
-	"linefire/filoio"
-	"linefire/level"
-	"linefire/render"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/render"
 )
 
 // Resolutions turn a met stage condition into an outcome, once: destroying every

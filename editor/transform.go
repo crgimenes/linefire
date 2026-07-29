@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // scopeID selects what a mirror/rotate transform applies to.

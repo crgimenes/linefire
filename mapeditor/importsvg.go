@@ -9,9 +9,9 @@ import (
 
 	"github.com/crgimenes/native/filedialog"
 
-	"linefire/asset"
-	"linefire/level"
-	"linefire/svgimport"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/svgimport"
 )
 
 // SVG import: pick a drawing with the native panel and drop its shapes into the open map's

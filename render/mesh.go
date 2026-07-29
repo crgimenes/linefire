@@ -8,7 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // glowColorScale brightens the emissive source feeding the bloom; the game then

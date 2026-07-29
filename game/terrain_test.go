@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // digSpot is a point well inside the rock of a boxLevel: outside the wall ring, but

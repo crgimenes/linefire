@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // TestBossIsShieldedUntilEscortsCleared: a boss takes no damage while any non-boss enemy is alive,

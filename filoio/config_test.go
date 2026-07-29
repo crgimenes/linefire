@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/config"
+	"github.com/crgimenes/linefire/config"
 )
 
 // TestConfigRoundTrips: settings must survive model -> Filo -> model, best times and all.

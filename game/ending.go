@@ -1,6 +1,6 @@
 package game
 
-import "linefire/filoio"
+import "github.com/crgimenes/linefire/filoio"
 
 // End-of-run pacing. A death or a campaign win used to freeze onto its screen the same frame it
 // happened, cutting off the payoff — the DEVOURER collapsing, the shot that killed you, the last

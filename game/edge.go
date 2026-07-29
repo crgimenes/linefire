@@ -3,7 +3,7 @@ package game
 import (
 	"fmt"
 
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // Digging past the edge: an authored or generated flood map is a finite grid of rock (the padding

@@ -5,7 +5,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 
-	"linefire/sfx"
+	"github.com/crgimenes/linefire/sfx"
 )
 
 // Continuous sounds (the thruster hum, the laser beam) loop while their state is

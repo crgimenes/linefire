@@ -3,7 +3,7 @@ package mapeditor
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // openPath builds an open polyline (M + L…) from world points.

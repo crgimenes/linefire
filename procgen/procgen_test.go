@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // dump renders a value for comparison. It replaced a json.Marshal helper when the JSON

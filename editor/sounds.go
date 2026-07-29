@@ -11,9 +11,9 @@ import (
 	"github.com/crgimenes/gion"
 	ui "github.com/crgimenes/minigui"
 
-	"linefire/asset"
-	"linefire/editorkit"
-	"linefire/sfx"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/editorkit"
+	"github.com/crgimenes/linefire/sfx"
 )
 
 // Sounds panel: author the asset's `sounds` block by ear. The EVENTS an asset can

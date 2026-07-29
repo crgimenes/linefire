@@ -8,7 +8,7 @@ import (
 	"github.com/crgimenes/native/filedialog"
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // mapPanelExt is the map extension the file panels filter on: filoio.ExtLevel (".lfm")

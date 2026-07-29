@@ -7,9 +7,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/render"
 )
 
 // The slot strip: four tiles at the bottom-right showing what each slot holds — the two

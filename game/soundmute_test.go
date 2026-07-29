@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestDemoMuteNeverPersists is the regression guard for the bug that muted crg's config:

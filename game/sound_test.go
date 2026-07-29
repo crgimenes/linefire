@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // The pure synthesis (variations, loops, stereo packing) is tested in the sfx

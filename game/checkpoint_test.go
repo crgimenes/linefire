@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 func TestSaveCheckpointClonesRun(t *testing.T) {

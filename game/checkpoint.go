@@ -8,7 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 )
 
 // triggerCheckpoint is the reserved zone Trigger that saves a run snapshot. Passing

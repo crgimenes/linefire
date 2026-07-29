@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"linefire/level"
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // procDir is where generated chunks are persisted (and reused on revisit). It is

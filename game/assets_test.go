@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestShippedGameAssetsLoadAndValidate guards the files in gameassets/: the

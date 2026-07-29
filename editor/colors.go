@@ -8,8 +8,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"github.com/crgimenes/linefire/render"
 	ui "github.com/crgimenes/minigui"
-	"linefire/render"
 )
 
 // Color panel geometry (logical pixels), below the hardpoints panel.

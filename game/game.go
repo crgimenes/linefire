@@ -16,11 +16,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
-	"linefire/procgen"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/procgen"
+	"github.com/crgimenes/linefire/render"
 
 	ui "github.com/crgimenes/minigui"
 )

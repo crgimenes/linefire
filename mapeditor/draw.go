@@ -9,10 +9,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"linefire/asset"
-	"linefire/editorkit"
-	"linefire/level"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/editorkit"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/render"
 )
 
 // UI colors.

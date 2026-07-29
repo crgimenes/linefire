@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestSavePathLabelUntitled: an unnamed map reads "untitled" in the status bar, a named one

@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"linefire/asset"
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // paletteEntry is a placeable thing discovered on disk: either a saved asset

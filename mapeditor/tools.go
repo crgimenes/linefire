@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // handleKind classifies a draggable point in the level.

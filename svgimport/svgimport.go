@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // Shape is one imported closed outline plus its marker label — the element's inkscape:label

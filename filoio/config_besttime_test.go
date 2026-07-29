@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/config"
+	"github.com/crgimenes/linefire/config"
 )
 
 func TestRecordBestTimeAndPreserve(t *testing.T) {

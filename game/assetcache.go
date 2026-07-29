@@ -4,9 +4,9 @@ import (
 	"io/fs"
 	"sync"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/render"
 )
 
 // Session-wide asset cache. Every world rebuild (portal, restart, attract swap)

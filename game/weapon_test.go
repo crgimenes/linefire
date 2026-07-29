@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // armSlot0 builds a game with one weapon collected and live in slot 0 (nil player:

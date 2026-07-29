@@ -1,4 +1,4 @@
-module linefire
+module github.com/crgimenes/linefire
 
 go 1.26.5
 

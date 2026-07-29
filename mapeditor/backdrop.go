@@ -12,8 +12,8 @@ import (
 	"github.com/crgimenes/native/filedialog"
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/asset"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/render"
 )
 
 // Reference backdrop: a raster template (e.g. a screenshot of a classic arcade map) shown behind

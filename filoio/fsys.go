@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // The game runtime reads its data through an fs.FS, so the shipped binary can serve

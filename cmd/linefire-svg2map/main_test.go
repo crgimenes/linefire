@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestRunImportsAndLoadsBack: the tool turns an SVG into a map the game can actually load —

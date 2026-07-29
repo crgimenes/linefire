@@ -6,7 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 )
 
 // Winning the game is the campaign's terminal state, distinct from a per-level clear: a

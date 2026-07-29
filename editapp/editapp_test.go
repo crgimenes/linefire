@@ -3,7 +3,7 @@ package editapp
 import (
 	"testing"
 
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestModeSwitch checks the host swaps between the map editor and the asset editor

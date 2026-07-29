@@ -7,7 +7,7 @@
 // the same vector + glow pipeline as ships.
 package level
 
-import "linefire/asset"
+import "github.com/crgimenes/linefire/asset"
 
 // CurrentVersion is the schema version written by this build. v2 unified the
 // separate enemies/power_ups lists into a single spawns list, each spawn carrying

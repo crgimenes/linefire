@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // resolutionLevel is a level with one enemy spawn and the given resolutions.

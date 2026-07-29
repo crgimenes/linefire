@@ -8,9 +8,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"linefire/asset"
-	"linefire/editorkit"
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/editorkit"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // handlePanelToggles maps the panel letter keys: O = hardpoints, L = colors,

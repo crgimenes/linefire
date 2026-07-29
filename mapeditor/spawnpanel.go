@@ -6,9 +6,9 @@ import (
 	"github.com/crgimenes/gion"
 	ui "github.com/crgimenes/minigui"
 
-	"linefire/editorkit"
-	"linefire/level"
-	"linefire/sfx"
+	"github.com/crgimenes/linefire/editorkit"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/sfx"
 )
 
 // spawnPanelTop is the panel y where the property panel sits — anchored to the BOTTOM so its

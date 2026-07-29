@@ -8,10 +8,10 @@ import (
 
 	"github.com/crgimenes/gion"
 
-	"linefire/asset"
-	"linefire/config"
-	"linefire/filoio"
-	"linefire/sfx"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/config"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/sfx"
 )
 
 // Sound is synthesized with gion (a library, not files): each effect is a small

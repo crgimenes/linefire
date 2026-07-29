@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 func vertex(e *Editor) *asset.Command {

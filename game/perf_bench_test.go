@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // benchGame loads the campaign's first map for render-path CPU benchmarks.

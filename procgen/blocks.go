@@ -5,8 +5,8 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // enemyArchKinds are the enemy archetype Kinds the generator scatters; each maps to

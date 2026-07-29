@@ -6,9 +6,9 @@ import (
 	"math"
 	"strings"
 
-	"linefire/asset"
-	"linefire/level"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/render"
 )
 
 // entityKind classifies a runtime actor.

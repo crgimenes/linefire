@@ -4,8 +4,8 @@ import (
 	"image/color"
 	"strings"
 
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // portalGraceFrames is how long after a warp portals stay inert, so the player

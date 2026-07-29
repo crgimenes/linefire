@@ -1,7 +1,7 @@
 package game
 
 import (
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 	"strings"
 	"testing"
 )

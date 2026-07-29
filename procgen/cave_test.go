@@ -4,8 +4,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // countGuards counts the enemy-archetype spawns in a level.

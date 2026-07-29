@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
-	"linefire/editorkit"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/editorkit"
 )
 
 func TestZoomAtKeepsCursorPointFixed(t *testing.T) {

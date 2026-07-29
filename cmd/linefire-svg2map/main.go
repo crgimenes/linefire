@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
-	"linefire/svgimport"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/svgimport"
 )
 
 func main() {

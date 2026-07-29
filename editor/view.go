@@ -6,7 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // handleView processes zooming (mouse wheel), panning (middle button, or space

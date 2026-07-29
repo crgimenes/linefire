@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"linefire/render"
+	"github.com/crgimenes/linefire/render"
 )
 
 func TestVisibleStep(t *testing.T) {

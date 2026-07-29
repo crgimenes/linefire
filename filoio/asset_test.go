@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // canonical drops the distinction between a nil slice and an empty one, which carries

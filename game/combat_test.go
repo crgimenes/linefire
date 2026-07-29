@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 func newCombatGame() *Game {

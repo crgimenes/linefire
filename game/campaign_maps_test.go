@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // TestNoShippedMapHasStuckEnemies loads every authored map and fails if any enemy spawn sits inside

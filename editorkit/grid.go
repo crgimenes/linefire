@@ -8,7 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"linefire/render"
+	"github.com/crgimenes/linefire/render"
 )
 
 // minDotPx is the smallest on-screen dot spacing before the grid coarsens.

@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 func TestProceduralLevelIsNavigable(t *testing.T) {

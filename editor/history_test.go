@@ -3,7 +3,7 @@ package editor
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // frame simulates one Update tick: snapshot the asset, run the edit (if any),

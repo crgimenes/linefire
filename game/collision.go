@@ -1,8 +1,8 @@
 package game
 
 import (
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 	"math"
 )
 

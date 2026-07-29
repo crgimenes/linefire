@@ -7,10 +7,10 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/editorkit"
+	"github.com/crgimenes/linefire/render"
 	ui "github.com/crgimenes/minigui"
-	"linefire/asset"
-	"linefire/editorkit"
-	"linefire/render"
 )
 
 // assetListTop is the panel y where the asset picker starts, below the

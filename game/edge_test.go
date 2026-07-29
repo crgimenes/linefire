@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/filoio"
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // TestDiggingPastEdgeDetectsBreach: the detector fires only when the ship reaches the flood grid's

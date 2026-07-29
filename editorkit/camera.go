@@ -7,7 +7,7 @@ import (
 	"image"
 	"math"
 
-	"linefire/render"
+	"github.com/crgimenes/linefire/render"
 )
 
 // Zoom limits and framing margin (in screen pixels of scale).

@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestFlyingOverWeaponCollectsIt: a weapon on the ground joins the arsenal and arms the

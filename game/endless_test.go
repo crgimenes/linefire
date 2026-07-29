@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/filoio"
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // TestEnterRiftStartsOneWayChain: taking the boss's portal drops the run into "The Rift" — a

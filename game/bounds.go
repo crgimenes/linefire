@@ -3,7 +3,7 @@ package game
 import (
 	"math"
 
-	"linefire/level"
+	"github.com/crgimenes/linefire/level"
 )
 
 // bounds is a world-space axis-aligned box. The fog, nav and flood grids are

@@ -3,7 +3,7 @@ package editor
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 func TestSelectHardpointSetsActiveHandle(t *testing.T) {

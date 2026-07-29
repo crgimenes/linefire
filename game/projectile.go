@@ -6,7 +6,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 const (

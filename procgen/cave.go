@@ -5,8 +5,8 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // Bonus cave rooms: a finite, self-contained procedural stage a player reaches by an OPTIONAL

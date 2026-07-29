@@ -12,7 +12,7 @@ import (
 
 	"github.com/crgimenes/filo"
 
-	"linefire/config"
+	"github.com/crgimenes/linefire/config"
 )
 
 // The config document — the player's personal settings, a denshi-style Filo script at

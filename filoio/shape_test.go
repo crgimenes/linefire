@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // firstPath pulls the sole layer's sole path out of a one-layer asset, failing loudly

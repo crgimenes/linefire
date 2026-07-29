@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestPortalEntersTargetMap drives a portal end to end: a source map with a

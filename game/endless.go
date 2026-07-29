@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"linefire/procgen"
+	"github.com/crgimenes/linefire/procgen"
 )
 
 // "The Rift" — the endless trap. After the finale's boss dies a portal opens at the boss's fall

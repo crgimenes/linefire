@@ -7,8 +7,8 @@ import (
 
 	"github.com/crgimenes/filo"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // The procedural chunk document — a level's walls and spawns without any of the

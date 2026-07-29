@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 func TestEnemyArchetypeFromKind(t *testing.T) {

@@ -3,7 +3,7 @@ package level
 import (
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 func TestNewIsValid(t *testing.T) {

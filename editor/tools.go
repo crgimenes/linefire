@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // handleKind classifies a draggable/snappable point in the document.

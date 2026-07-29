@@ -4,8 +4,8 @@ import (
 	"image"
 	"math"
 
-	"linefire/asset"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/render"
 )
 
 // canvasRect is the screen region used for the world canvas.

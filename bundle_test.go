@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/filoio"
+	"github.com/crgimenes/linefire/filoio"
 )
 
 // bundleMapDir mirrors cmd/linefire's constant: the maps/assets subdirectory inside

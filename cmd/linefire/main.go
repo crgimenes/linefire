@@ -22,9 +22,9 @@ import (
 
 	"github.com/crgimenes/devengine/log"
 
-	"linefire"
-	"linefire/filoio"
-	"linefire/game"
+	"github.com/crgimenes/linefire"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/game"
 )
 
 // version is stamped at build time (see the release target: -X main.version=...).

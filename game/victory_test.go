@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestFinaleEnemiesAreNotStuckInWalls guards a real authoring hazard: an enemy spawned

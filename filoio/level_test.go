@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // canonicalLevel drops nil-vs-empty on the slices the JSON encoder always wrote out.

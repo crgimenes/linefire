@@ -1,6 +1,6 @@
 package game
 
-import "linefire/procgen"
+import "github.com/crgimenes/linefire/procgen"
 
 // Bonus rooms: an OPTIONAL portal in an authored level ("@bonus" or "@bonus:returnTarget")
 // warps to a procedurally generated cave (procgen.GenCaveRoom) full of loot and a few guards.

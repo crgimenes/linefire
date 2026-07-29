@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 func finite(x float64) bool {

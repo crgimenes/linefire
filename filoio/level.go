@@ -8,8 +8,8 @@ import (
 
 	"github.com/crgimenes/filo"
 
-	"linefire/asset"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
 )
 
 // The level document. Walls are the shape grammar under the name (wall ...); the rest

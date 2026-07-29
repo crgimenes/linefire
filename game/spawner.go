@@ -4,9 +4,9 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"linefire/asset"
-	"linefire/level"
-	"linefire/render"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/render"
 )
 
 // Horde spawner: a stage can declare a time-based enemy spawner (level.Horde) that

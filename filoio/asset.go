@@ -8,7 +8,7 @@ import (
 
 	"github.com/crgimenes/filo"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // The asset document. The name is positional (like Filo's own (fn name ...)), every

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"linefire/asset"
+	"github.com/crgimenes/linefire/asset"
 )
 
 // newTestEditor builds an editor over a fresh asset for pure (non-GUI) tests.

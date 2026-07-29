@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"linefire/asset"
-	"linefire/filoio"
-	"linefire/level"
+	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
 // TestMapStatePersistsClears clears a map (kill the enemy, take the pickup),

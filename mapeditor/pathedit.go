@@ -1,6 +1,6 @@
 package mapeditor
 
-import "linefire/asset"
+import "github.com/crgimenes/linefire/asset"
 
 // Path editing (kutta-style): the Delete tool removes a node under the cursor, and the Join tool
 // connects two OPEN endpoints with a new line — splicing two paths into one, or closing a path onto
