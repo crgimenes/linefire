@@ -3,6 +3,8 @@ package game
 import (
 	"image/color"
 	"math"
+
+	"github.com/crgimenes/linefire/effects"
 )
 
 const (
@@ -25,16 +27,16 @@ var (
 // emitMissileTrail leaves a short fiery trail behind a missile in flight.
 func (g *Game) emitMissileTrail(x, y float64) {
 	life := 10 + randIntN(8)
-	g.emit(particle{
-		x: x, y: y,
-		vx:      (randFloat()*2 - 1) * 0.3,
-		vy:      (randFloat()*2 - 1) * 0.3,
-		drag:    0.9,
-		life:    life,
-		maxLife: life,
-		size:    1.0,
-		col:     missileColor,
-		style:   styleDot,
+	g.emit(effects.Particle{
+		X: x, Y: y,
+		VX:      (randFloat()*2 - 1) * 0.3,
+		VY:      (randFloat()*2 - 1) * 0.3,
+		Drag:    0.9,
+		Life:    life,
+		MaxLife: life,
+		Size:    1.0,
+		Col:     missileColor,
+		Style:   effects.StyleDot,
 	})
 }
 

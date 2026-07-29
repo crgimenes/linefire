@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/crgimenes/linefire/effects"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -75,16 +76,16 @@ func (g *Game) emitBoostFlame(fx, fy float64) {
 		speed := boostFlameSpeedMin + randFloat()*(boostFlameSpeedMax-boostFlameSpeedMin)
 		fan := (randFloat()*2 - 1) * boostFlameSpread * speed
 		life := boostFlameLifeMin + randIntN(boostFlameLifeMax-boostFlameLifeMin+1)
-		g.emit(particle{
-			x: rearX, y: rearY,
-			vx:      -fx*speed + px*fan,
-			vy:      -fy*speed + py*fan,
-			drag:    0.90,
-			life:    life,
-			maxLife: life,
-			size:    boostFlameSize,
-			col:     boostFlameColor,
-			style:   styleStreak,
+		g.emit(effects.Particle{
+			X: rearX, Y: rearY,
+			VX:      -fx*speed + px*fan,
+			VY:      -fy*speed + py*fan,
+			Drag:    0.90,
+			Life:    life,
+			MaxLife: life,
+			Size:    boostFlameSize,
+			Col:     boostFlameColor,
+			Style:   effects.StyleStreak,
 		})
 	}
 }

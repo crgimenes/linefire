@@ -1,8 +1,9 @@
 package game
 
-import "slices"
-
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // The arsenal is everything the player has collected, in pickup order — no mounts, no
 // hangar, no drop-swap. Two slots each point at one collected weapon; slot 0 fires with

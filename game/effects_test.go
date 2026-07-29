@@ -1,31 +1,35 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crgimenes/linefire/effects"
+)
 
 func TestParticlesSpawnAgeAndExpire(t *testing.T) {
 	g := &Game{}
 	g.emitExplosion(100, 100)
-	want := explosionStreaks.n + explosionChunks.n
-	if len(g.particles) != want {
-		t.Fatalf("particles = %d, want %d", len(g.particles), want)
+	want := effects.ExplosionStreaks.N + effects.ExplosionChunks.N
+	if g.fxPool().Len() != want {
+		t.Fatalf("particles = %d, want %d", g.fxPool().Len(), want)
 	}
 
 	// After well past the longest lifetime, every particle is gone.
 	for range 100 {
 		g.stepParticles()
 	}
-	if len(g.particles) != 0 {
-		t.Fatalf("particles should all expire, %d left", len(g.particles))
+	if g.fxPool().Len() != 0 {
+		t.Fatalf("particles should all expire, %d left", g.fxPool().Len())
 	}
 }
 
 func TestParticlePoolIsBounded(t *testing.T) {
 	g := &Game{}
-	for range maxParticles { // far more emits than the cap allows
+	for range effects.DefaultMax { // far more emits than the cap allows
 		g.emitExplosion(0, 0)
 	}
-	if len(g.particles) > maxParticles {
-		t.Fatalf("particle pool grew past the cap: %d > %d", len(g.particles), maxParticles)
+	if g.fxPool().Len() > effects.DefaultMax {
+		t.Fatalf("particle pool grew past the cap: %d > %d", g.fxPool().Len(), effects.DefaultMax)
 	}
 }
 
@@ -34,15 +38,15 @@ func TestThrusterEmitsBehindShip(t *testing.T) {
 	g.x, g.y, g.radius = 100, 50, 8
 	g.emitThruster(1, 0) // facing +x, so exhaust starts at the rear and moves -x
 
-	if len(g.particles) != thrusterPerFrame {
-		t.Fatalf("thruster particles = %d, want %d", len(g.particles), thrusterPerFrame)
+	if g.fxPool().Len() != thrusterPerFrame {
+		t.Fatalf("thruster particles = %d, want %d", g.fxPool().Len(), thrusterPerFrame)
 	}
-	for _, p := range g.particles {
-		if p.x > g.x {
-			t.Fatalf("exhaust should start at or behind the ship, got x=%v (ship x=%v)", p.x, g.x)
+	for _, p := range g.fxPool().Particles() {
+		if p.X > g.x {
+			t.Fatalf("exhaust should start at or behind the ship, got x=%v (ship x=%v)", p.X, g.x)
 		}
-		if p.vx >= 0 {
-			t.Fatalf("exhaust should move backward (vx<0), got vx=%v", p.vx)
+		if p.VX >= 0 {
+			t.Fatalf("exhaust should move backward (vx<0), got vx=%v", p.VX)
 		}
 	}
 }
@@ -58,7 +62,7 @@ func TestShieldAbsorbEmitsSparks(t *testing.T) {
 	if g.health != maxHealth {
 		t.Fatalf("health should be untouched while the shield holds, got %d", g.health)
 	}
-	if len(g.particles) == 0 {
+	if g.fxPool().Len() == 0 {
 		t.Fatal("a shielded hit should emit deflection sparks")
 	}
 }
@@ -72,7 +76,7 @@ func TestBulletHittingWallSparks(t *testing.T) {
 	if len(g.projectiles) != 0 {
 		t.Fatalf("the bullet should be consumed by the wall, %d left", len(g.projectiles))
 	}
-	if len(g.particles) == 0 {
+	if g.fxPool().Len() == 0 {
 		t.Fatal("a bullet striking a wall should emit sparks")
 	}
 }
@@ -104,7 +108,7 @@ func TestDamageEnemyFlashesThenExplodes(t *testing.T) {
 	if g.enemiesLeft() != 1 || g.entities[0].hitFlash <= 0 {
 		t.Fatalf("first hit should flash and survive: left=%d flash=%d", g.enemiesLeft(), g.entities[0].hitFlash)
 	}
-	if len(g.particles) != 0 {
+	if g.fxPool().Len() != 0 {
 		t.Fatal("no explosion before the enemy dies")
 	}
 
@@ -112,9 +116,9 @@ func TestDamageEnemyFlashesThenExplodes(t *testing.T) {
 	if g.enemiesLeft() != 0 {
 		t.Fatalf("second hit should destroy the enemy, %d left", g.enemiesLeft())
 	}
-	want := explosionStreaks.n + explosionChunks.n
-	if len(g.particles) != want {
-		t.Fatalf("death should spawn %d particles, got %d", want, len(g.particles))
+	want := effects.ExplosionStreaks.N + effects.ExplosionChunks.N
+	if g.fxPool().Len() != want {
+		t.Fatalf("death should spawn %d particles, got %d", want, g.fxPool().Len())
 	}
 	if g.shakeMag <= 0 {
 		t.Fatal("death should add screen shake")

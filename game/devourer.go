@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/crgimenes/linefire/effects"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -46,14 +47,14 @@ var (
 	devourerColor       = color.RGBA{0xc0, 0x40, 0xff, 0xff} // accretion violet
 	devourerDebrisColor = color.RGBA{0x90, 0x40, 0xe0, 0xff}
 	// devourerSwallowBurst is the flash when an object is crushed at the core.
-	devourerSwallowBurst = burstSpec{
-		n: 10, col: devourerColor, style: styleStreak,
-		speedMin: 1.0, speedMax: 4.0, lifeMin: 8, lifeMax: 16, drag: 0.85,
+	devourerSwallowBurst = effects.Burst{
+		N: 10, Col: devourerColor, Style: effects.StyleStreak,
+		SpeedMin: 1.0, SpeedMax: 4.0, LifeMin: 8, LifeMax: 16, Drag: 0.85,
 	}
 	// devourerCollapseBurst is the violet flare over the implosion.
-	devourerCollapseBurst = burstSpec{
-		n: 34, col: devourerColor, style: styleStreak,
-		speedMin: 4.0, speedMax: 11.0, lifeMin: 18, lifeMax: 40, drag: 0.9,
+	devourerCollapseBurst = effects.Burst{
+		N: 34, Col: devourerColor, Style: effects.StyleStreak,
+		SpeedMin: 4.0, SpeedMax: 11.0, LifeMin: 18, LifeMax: 40, Drag: 0.9,
 	}
 )
 
@@ -240,10 +241,10 @@ func (g *Game) spawnDevourerDebris(d *devourer) {
 		r := devourerReach * (0.35 + 0.35*randFloat())
 		sp := 5 + randFloat()*4
 		px, py := d.x+r*math.Cos(ang), d.y+r*math.Sin(ang)
-		g.emit(particle{
-			x: px, y: py, px: px, py: py,
-			vx: -math.Cos(ang) * sp, vy: -math.Sin(ang) * sp,
-			drag: 1.0, life: 34, maxLife: 34, size: 1.3, col: devourerDebrisColor, style: styleStreak,
+		g.emit(effects.Particle{
+			X: px, Y: py, PX: px, PY: py,
+			VX: -math.Cos(ang) * sp, VY: -math.Sin(ang) * sp,
+			Drag: 1.0, Life: 34, MaxLife: 34, Size: 1.3, Col: devourerDebrisColor, Style: effects.StyleStreak,
 		})
 	}
 }

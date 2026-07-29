@@ -3,6 +3,8 @@ package game
 import (
 	"image/color"
 	"math"
+
+	"github.com/crgimenes/linefire/effects"
 )
 
 // When the ship arrives somewhere — through a portal, a return warp, or by digging past an edge —
@@ -41,16 +43,16 @@ func (g *Game) emitMaterialize(x, y float64) {
 		r := materializeRadius * (0.8 + 0.4*randFloat())
 		px, py := x+r*math.Cos(ang), y+r*math.Sin(ang)
 		sp := r / float64(materializeLife) // reaches the centre exactly at end of life
-		g.emit(particle{
-			x: px, y: py, px: px, py: py,
-			vx:      -math.Cos(ang) * sp,
-			vy:      -math.Sin(ang) * sp,
-			drag:    1.0,
-			life:    materializeLife,
-			maxLife: materializeLife,
-			size:    materializeSize,
-			col:     materializeColor,
-			style:   styleStreak,
+		g.emit(effects.Particle{
+			X: px, Y: py, PX: px, PY: py,
+			VX:      -math.Cos(ang) * sp,
+			VY:      -math.Sin(ang) * sp,
+			Drag:    1.0,
+			Life:    materializeLife,
+			MaxLife: materializeLife,
+			Size:    materializeSize,
+			Col:     materializeColor,
+			Style:   effects.StyleStreak,
 		})
 	}
 }

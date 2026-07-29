@@ -1,9 +1,10 @@
 package game
 
 import (
-	"github.com/crgimenes/linefire/level"
 	"strings"
 	"testing"
+
+	"github.com/crgimenes/linefire/level"
 )
 
 func TestLogAppendsCapsAndExpires(t *testing.T) {

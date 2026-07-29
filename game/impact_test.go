@@ -12,11 +12,11 @@ func TestImpactBurstScalesWithDamage(t *testing.T) {
 
 	g := &Game{}
 	g.impactBurst(0, 0, light, false)
-	lightN := len(g.particles)
+	lightN := g.fxPool().Len()
 
 	g = &Game{}
 	g.impactBurst(0, 0, heavy, false)
-	heavyN := len(g.particles)
+	heavyN := g.fxPool().Len()
 
 	if heavyN <= lightN {
 		t.Fatalf("a heavier shot should throw more sparks: light=%d heavy=%d", lightN, heavyN)

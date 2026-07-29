@@ -7,6 +7,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/effects"
+	"github.com/crgimenes/linefire/render"
 )
 
 const (
@@ -118,7 +120,7 @@ func (g *Game) drawMuzzleFlash(dst *ebiten.Image, cam ebiten.GeoM, col color.RGB
 	cx, cy := cam.Apply(mx, my)
 	c := col
 	c.A = uint8(float64(col.A) * frac)
-	fillCircle(dst, cx, cy, radius*g.dpr*frac, c)
+	render.FillCircle(dst, cx, cy, radius*g.dpr*frac, c)
 }
 
 // stepProjectiles ages the weapon cooldowns and advances every player projectile
@@ -198,9 +200,9 @@ func (g *Game) stepPlayerShots(shots []projectile) []projectile {
 func (g *Game) impactBurst(x, y float64, p *projectile, hitEnemy bool) {
 	col := p.rglow
 	n := min(impactSparksBase+p.dmg*impactSparksPerDmg, impactMaxSparks)
-	g.emitBurst(x, y, burstSpec{
-		n: n, col: col, style: styleStreak,
-		speedMin: 1.5, speedMax: 3.0 + float64(p.dmg), lifeMin: 6, lifeMax: 14, drag: 0.82,
+	g.emitBurst(x, y, effects.Burst{
+		N: n, Col: col, Style: effects.StyleStreak,
+		SpeedMin: 1.5, SpeedMax: 3.0 + float64(p.dmg), LifeMin: 6, LifeMax: 14, Drag: 0.82,
 	})
 	if hitEnemy {
 		g.addShake(impactShakeBase + float64(p.dmg)*impactShakePerDmg)
@@ -232,7 +234,7 @@ func (g *Game) stepEnemyShots() {
 			// enemy-hull units (1), so the same formula would read as a much bigger
 			// burst for the same event.
 			sparks := wallSparks
-			sparks.col = p.rglow
+			sparks.Col = p.rglow
 			g.emitBurst(rx, ry, sparks)
 			continue
 		}
@@ -334,7 +336,7 @@ func (g *Game) boltTrail(dst *ebiten.Image, x0, y0, x1, y1, width float64, col c
 	for i := range boltTrailSteps {
 		f := 1 - float64(i)/boltTrailSteps // full behind the bolt, fading to nothing at the tail
 		ax, ay := x0+dx*float64(i), y0+dy*float64(i)
-		strokeLineAdd(dst, ax, ay, ax+dx, ay+dy, width*f*g.dpr, col, gain*f)
+		render.StrokeLineAdd(dst, ax, ay, ax+dx, ay+dy, width*f*g.dpr, col, gain*f)
 	}
 }
 
@@ -344,8 +346,8 @@ func (g *Game) boltTrail(dst *ebiten.Image, x0, y0, x1, y1, width float64, col c
 // the soft outer halo on top of that.
 func (g *Game) drawBolt(dst *ebiten.Image, x0, y0, x1, y1, width float64, core, halo color.RGBA) {
 	g.boltTrail(dst, x0, y0, x1, y1, width*boltHaloWidth, halo, boltHaloGain)
-	strokeLineAdd(dst, x0, y0, x1, y1, width*boltHaloWidth*g.dpr, halo, boltHaloGain)
-	strokeLineAdd(dst, x0, y0, x1, y1, width*g.dpr, core, 1)
+	render.StrokeLineAdd(dst, x0, y0, x1, y1, width*boltHaloWidth*g.dpr, halo, boltHaloGain)
+	render.StrokeLineAdd(dst, x0, y0, x1, y1, width*g.dpr, core, 1)
 }
 
 // drawBolts draws a projectile pool as streaks from each shot's previous to its
@@ -363,7 +365,7 @@ func (g *Game) drawBolts(dst *ebiten.Image, cam ebiten.GeoM, shots []projectile,
 		x1, y1 := cam.Apply(p.x, p.y)
 		if glow {
 			g.boltTrail(dst, x0, y0, x1, y1, p.glowW, p.rglow, 1)
-			strokeLine(dst, x0, y0, x1, y1, p.glowW*g.dpr, p.rglow)
+			render.StrokeLine(dst, x0, y0, x1, y1, p.glowW*g.dpr, p.rglow)
 			continue
 		}
 		g.drawBolt(dst, x0, y0, x1, y1, p.width, p.rcol, p.rglow)

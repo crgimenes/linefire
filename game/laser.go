@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/crgimenes/linefire/render"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -149,8 +150,8 @@ func (g *Game) drawLaser(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 	wpx *= lerp(1, thin, h)
 	col.A = uint8(float64(col.A) * lerp(1, laserDimMin, h))
 
-	strokeLine(dst, x0, y0, x1, y1, wpx*g.dpr, col)
-	fillCircle(dst, x1, y1, wpx*0.9*g.dpr, col)
+	render.StrokeLine(dst, x0, y0, x1, y1, wpx*g.dpr, col)
+	render.FillCircle(dst, x1, y1, wpx*0.9*g.dpr, col)
 }
 
 // laserHeatFrac is how loaded the emitter is, 0 (cold) to 1 (about to cut out).

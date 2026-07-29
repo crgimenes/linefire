@@ -1,9 +1,10 @@
 package game
 
 import (
+	"math"
+
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
-	"math"
 )
 
 // assetRadius returns an asset's collision radius from its first circle

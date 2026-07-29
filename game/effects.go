@@ -2,29 +2,16 @@ package game
 
 import (
 	"image/color"
-	"math"
 
+	"github.com/crgimenes/linefire/effects"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// The particle pool itself lives in the effects package, along with the pool cap,
+// the streak widths and the explosion preset. What stays here is this game's own
+// presets — thruster, rock, shield, pickup, missile — which are data on top of it.
 const (
-	explosionSparks   = 14   // streak particles spawned when an enemy is destroyed
-	explosionDebris   = 6    // dot particles (chunks) added to the same explosion
-	sparkSpeedMin     = 2.0  // world units per frame
-	sparkSpeedMax     = 6.0  // world units per frame
-	sparkLifeMin      = 18   // frames
-	sparkLifeMax      = 34   // frames
-	sparkDrag         = 0.90 // velocity retained per frame (sparks slow down)
-	sparkWidth        = 1.6  // crisp streak width, logical px (scaled by DPI)
-	sparkGlowWidth    = 3.0  // wider emissive streak feeding the bloom
-	muzzleFlashFrames = 4    // how long the muzzle flash lingers
-
-	// maxParticles caps the live pool: a hard backstop so a pile-up of explosions
-	// can never grow the slice without bound. Particles are purely cosmetic, so
-	// emits past the cap are dropped silently (the oldest keep aging out).
-	maxParticles = 1500
-
-	dotGlowScale = 1.8 // dot radius multiplier in the emissive pass (softer bloom)
+	muzzleFlashFrames = 4 // how long the muzzle flash lingers
 
 	// Thruster exhaust: a sparse plume trailed from the ship's rear each frame it
 	// accelerates, so the counts stay small (the pool cap is the backstop). It is cut
@@ -42,8 +29,7 @@ const (
 )
 
 var (
-	sparkColor       = color.RGBA{0xff, 0xc8, 0x60, 0xff} // warm explosion core
-	debrisColor      = color.RGBA{0xff, 0x90, 0x40, 0xff} // hotter ember chunks
+	debrisColor      = effects.DebrisColor                // ember chunks, shared with the explosion
 	pickupColor      = color.RGBA{0x80, 0xff, 0xb0, 0xff} // green pickup burst
 	muzzleColor      = color.RGBA{0xe8, 0xff, 0xff, 0xff} // bright muzzle flash
 	wallSparkColor   = color.RGBA{0xc0, 0xff, 0xff, 0xff} // wallSparks default, for a caller with no shot color to pass
@@ -78,76 +64,31 @@ func (g *Game) updateShakeOffset() {
 	g.shakeY = (randFloat()*2 - 1) * g.shakeMag * g.dpr
 }
 
-// partStyle selects how a particle is drawn.
-type partStyle uint8
-
-const (
-	styleStreak partStyle = iota // fading line from the previous to the current point
-	styleDot                     // fading disc of `size` world units (chunks, motes)
-)
-
-// particle is a short-lived cosmetic effect element. It carries its own motion
-// (velocity + drag) and look (style/size/color) so one pool drives every effect.
-type particle struct {
-	x, y    float64
-	px, py  float64 // previous point, for the streak style
-	vx, vy  float64
-	drag    float64
-	life    int
-	maxLife int
-	size    float64 // dot radius in world units (styleDot only)
-	col     color.RGBA
-	style   partStyle
-}
-
-// burstSpec is a named emitter preset: a radial spray of particles sharing a
-// look and a speed/lifetime range. New effects are a new preset, not new code.
-type burstSpec struct {
-	n                  int
-	col                color.RGBA
-	style              partStyle
-	speedMin, speedMax float64
-	lifeMin, lifeMax   int
-	drag               float64
-	size               float64 // dot radius (styleDot only)
-}
-
 var (
-	// explosionStreaks + explosionChunks make up an enemy death: warm streaks
-	// flung out fast, plus a few slower glowing chunks that linger.
-	explosionStreaks = burstSpec{
-		n: explosionSparks, col: sparkColor, style: styleStreak,
-		speedMin: sparkSpeedMin, speedMax: sparkSpeedMax,
-		lifeMin: sparkLifeMin, lifeMax: sparkLifeMax, drag: sparkDrag,
-	}
-	explosionChunks = burstSpec{
-		n: explosionDebris, col: debrisColor, style: styleDot,
-		speedMin: 1.0, speedMax: 3.5, lifeMin: 26, lifeMax: 46, drag: 0.93, size: 1.6,
-	}
 	// pickupMotes is the soft green puff when a power-up is collected.
-	pickupMotes = burstSpec{
-		n: pickupSparks, col: pickupColor, style: styleDot,
-		speedMin: 1.5, speedMax: 4.0, lifeMin: 16, lifeMax: 28, drag: 0.90, size: 1.3,
+	pickupMotes = effects.Burst{
+		N: pickupSparks, Col: pickupColor, Style: effects.StyleDot,
+		SpeedMin: 1.5, SpeedMax: 4.0, LifeMin: 16, LifeMax: 28, Drag: 0.90, Size: 1.3,
 	}
 	// wallSparks is the brief cyan flash where a bullet strikes a wall.
-	wallSparks = burstSpec{
-		n: 5, col: wallSparkColor, style: styleStreak,
-		speedMin: 1.5, speedMax: 4.0, lifeMin: 8, lifeMax: 16, drag: 0.82,
+	wallSparks = effects.Burst{
+		N: 5, Col: wallSparkColor, Style: effects.StyleStreak,
+		SpeedMin: 1.5, SpeedMax: 4.0, LifeMin: 8, LifeMax: 16, Drag: 0.82,
 	}
 	// shieldSparks fly off the hull when the shield absorbs a hit.
-	shieldSparks = burstSpec{
-		n: 9, col: shieldSparkColor, style: styleStreak,
-		speedMin: 2.0, speedMax: 5.0, lifeMin: 10, lifeMax: 20, drag: 0.85,
+	shieldSparks = effects.Burst{
+		N: 9, Col: shieldSparkColor, Style: effects.StyleStreak,
+		SpeedMin: 2.0, SpeedMax: 5.0, LifeMin: 10, LifeMax: 20, Drag: 0.85,
 	}
 	// missileBlast + missileBlastChunks are the big area-of-effect detonation: a
 	// fast wide spray of orange streaks plus heavy glowing chunks.
-	missileBlast = burstSpec{
-		n: 22, col: missileColor, style: styleStreak,
-		speedMin: 3.0, speedMax: 8.5, lifeMin: 16, lifeMax: 32, drag: 0.88,
+	missileBlast = effects.Burst{
+		N: 22, Col: missileColor, Style: effects.StyleStreak,
+		SpeedMin: 3.0, SpeedMax: 8.5, LifeMin: 16, LifeMax: 32, Drag: 0.88,
 	}
-	missileBlastChunks = burstSpec{
-		n: 12, col: debrisColor, style: styleDot,
-		speedMin: 1.5, speedMax: 5.0, lifeMin: 30, lifeMax: 52, drag: 0.92, size: 2.0,
+	missileBlastChunks = effects.Burst{
+		N: 12, Col: debrisColor, Style: effects.StyleDot,
+		SpeedMin: 1.5, SpeedMax: 5.0, LifeMin: 30, LifeMax: 52, Drag: 0.92, Size: 2.0,
 	}
 
 	// Rock thrown off by a bite out of the map. Digging must read as EXCAVATION, not
@@ -159,60 +100,50 @@ var (
 
 // beamCutout is the puff of vapour thrown off the tip when the overheated beam dies:
 // it, the falling whistle and the wilting beam are the ONLY notice the player gets.
-var beamCutout = burstSpec{
-	n: 11, col: laserGlowColor, style: styleStreak,
-	speedMin: 0.7, speedMax: 2.6, lifeMin: 12, lifeMax: 28, drag: 0.87,
+var beamCutout = effects.Burst{
+	N: 11, Col: laserGlowColor, Style: effects.StyleStreak,
+	SpeedMin: 0.7, SpeedMax: 2.6, LifeMin: 12, LifeMax: 28, Drag: 0.87,
 }
 
 // rockChunks is the heavy debris a bite of radius r knocks loose: slow, lingering.
-func rockChunks(r float64) burstSpec {
-	return burstSpec{
-		n: min(max(int(1+r*0.5), 2), 14), col: rockChunkColor, style: styleDot,
-		speedMin: 0.5, speedMax: 1.2 + r*0.06, lifeMin: 16, lifeMax: 34, drag: 0.90, size: 1.3,
+func rockChunks(r float64) effects.Burst {
+	return effects.Burst{
+		N: min(max(int(1+r*0.5), 2), 14), Col: rockChunkColor, Style: effects.StyleDot,
+		SpeedMin: 0.5, SpeedMax: 1.2 + r*0.06, LifeMin: 16, LifeMax: 34, Drag: 0.90, Size: 1.3,
 	}
 }
 
 // rockGrit is the light dust off the same bite: faster, shorter-lived streaks.
-func rockGrit(r float64) burstSpec {
-	return burstSpec{
-		n: min(max(int(2+r*0.8), 3), 18), col: rockGritColor, style: styleStreak,
-		speedMin: 1.0, speedMax: 2.2 + r*0.12, lifeMin: 8, lifeMax: 18, drag: 0.86,
+func rockGrit(r float64) effects.Burst {
+	return effects.Burst{
+		N: min(max(int(2+r*0.8), 3), 18), Col: rockGritColor, Style: effects.StyleStreak,
+		SpeedMin: 1.0, SpeedMax: 2.2 + r*0.12, LifeMin: 8, LifeMax: 18, Drag: 0.86,
 	}
 }
 
-// emit appends one particle, respecting the hard pool cap (see maxParticles).
-func (g *Game) emit(p particle) {
-	if len(g.particles) >= maxParticles {
-		return
+// fxPool returns the particle pool, building it on first use: a zero Game — which
+// the tests construct directly — has to be usable without a constructor.
+func (g *Game) fxPool() *effects.Pool {
+	if g.fx == nil {
+		g.fx = effects.New(effects.DefaultMax, randFloat)
 	}
-	p.px, p.py = p.x, p.y
-	g.particles = append(g.particles, p)
+	return g.fx
+}
+
+// emit appends one particle to the pool.
+func (g *Game) emit(p effects.Particle) {
+	g.fxPool().Emit(p)
 }
 
 // emitBurst sprays one preset radially from (x, y).
-func (g *Game) emitBurst(x, y float64, s burstSpec) {
-	for range s.n {
-		ang := randFloat() * 2 * math.Pi
-		speed := s.speedMin + randFloat()*(s.speedMax-s.speedMin)
-		life := s.lifeMin + randIntN(s.lifeMax-s.lifeMin+1)
-		g.emit(particle{
-			x: x, y: y,
-			vx:      math.Cos(ang) * speed,
-			vy:      math.Sin(ang) * speed,
-			drag:    s.drag,
-			life:    life,
-			maxLife: life,
-			size:    s.size,
-			col:     s.col,
-			style:   s.style,
-		})
-	}
+func (g *Game) emitBurst(x, y float64, s effects.Burst) {
+	g.fxPool().Burst(x, y, s)
 }
 
-// emitExplosion plays the enemy-death effect: streaks plus glowing chunks.
+// emitExplosion plays the death effect: streaks plus glowing chunks. It is the
+// package's, so a ship blows up the same way here and in Linefire Skirmish.
 func (g *Game) emitExplosion(x, y float64) {
-	g.emitBurst(x, y, explosionStreaks)
-	g.emitBurst(x, y, explosionChunks)
+	g.fxPool().Explosion(x, y)
 }
 
 // emitThruster trails exhaust from the ship's rear while it accelerates along the
@@ -227,68 +158,31 @@ func (g *Game) emitThruster(fx, fy float64) {
 		speed := thrusterSpeedMin + randFloat()*(thrusterSpeedMax-thrusterSpeedMin)
 		fan := (randFloat()*2 - 1) * thrusterSpread * speed
 		life := thrusterLifeMin + randIntN(thrusterLifeMax-thrusterLifeMin+1)
-		g.emit(particle{
-			x: rearX, y: rearY,
-			vx:      -fx*speed + px*fan,
-			vy:      -fy*speed + py*fan,
-			drag:    thrusterDrag,
-			life:    life,
-			maxLife: life,
-			col:     thrusterColor,
-			style:   styleStreak,
+		g.emit(effects.Particle{
+			X: rearX, Y: rearY,
+			VX:      -fx*speed + px*fan,
+			VY:      -fy*speed + py*fan,
+			Drag:    thrusterDrag,
+			Life:    life,
+			MaxLife: life,
+			Col:     thrusterColor,
+			Style:   effects.StyleStreak,
 		})
 	}
 }
 
-// stepParticles advances and ages every particle, dropping the dead ones. Pure
-// motion (no rendering), so it is cheap and unit-testable.
+// stepParticles advances and ages every particle, dropping the dead ones.
 func (g *Game) stepParticles() {
-	kept := g.particles[:0]
-	for i := range g.particles {
-		p := g.particles[i]
-		p.life--
-		if p.life <= 0 {
-			continue
-		}
-		p.px, p.py = p.x, p.y
-		p.x += p.vx
-		p.y += p.vy
-		p.vx *= p.drag
-		p.vy *= p.drag
-		kept = append(kept, p)
-	}
-	g.particles = kept
+	g.fxPool().Step()
 }
 
-// drawParticles renders the pool, fading each particle with its remaining life.
-// glow widens streaks and discs so the same pool feeds the bloom buffer too.
-//
-// Every particle here is LIGHT — engine exhaust, sparks, embers, pickup motes — so
-// they ADD to the scene like the bolts do (and like kutta composites its smoke)
-// instead of painting over it. The remaining life drives the additive gain rather
-// than the color's alpha: additive blending ignores what is under it, so fading
-// the alpha alone would leave a dying spark just as bright as a fresh one.
+// drawParticles renders the pool through the camera; glow selects the wider
+// strokes that feed the bloom buffer.
 func (g *Game) drawParticles(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
-	streakW := sparkWidth
-	sizeScale := 1.0
-	if glow {
-		streakW = sparkGlowWidth
-		sizeScale = dotGlowScale
-	}
-	for i := range g.particles {
-		p := &g.particles[i]
-		frac := float64(p.life) / float64(p.maxLife)
-		if p.style == styleDot {
-			cx, cy := cam.Apply(p.x, p.y)
-			r := p.size * g.camPixelScale() * sizeScale * frac
-			if r < 0.5*g.dpr {
-				r = 0.5 * g.dpr // keep a visible speck until it fades out
-			}
-			fillCircleAdd(dst, cx, cy, r, p.col, frac)
-			continue
-		}
-		x0, y0 := cam.Apply(p.px, p.py)
-		x1, y1 := cam.Apply(p.x, p.y)
-		strokeLineAdd(dst, x0, y0, x1, y1, streakW*g.dpr, p.col, frac)
-	}
+	g.fxPool().Draw(dst, effects.View{
+		Cam:        cam,
+		DPR:        g.dpr,
+		PixelScale: g.camPixelScale(),
+		Glow:       glow,
+	})
 }

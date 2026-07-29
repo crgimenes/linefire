@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/crgimenes/linefire/render"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -54,7 +55,7 @@ func (g *Game) drawMinimap(dst *ebiten.Image) {
 		bx, by := toMap(sp[2], sp[3])
 		nx0, ny0, nx1, ny1, ok := clipSegToCircle(ax, ay, bx, by, cx, cy, miniRadius)
 		if ok {
-			strokeLine(dst, nx0, ny0, nx1, ny1, 1, miniWall)
+			render.StrokeLine(dst, nx0, ny0, nx1, ny1, 1, miniWall)
 		}
 	}
 
@@ -67,7 +68,7 @@ func (g *Game) drawMinimap(dst *ebiten.Image) {
 		}
 		mx, my := toMap(e.x, e.y)
 		if math.Hypot(mx-cx, my-cy) <= miniRadius {
-			fillCircle(dst, mx, my, 2, markerColor(e.align))
+			render.FillCircle(dst, mx, my, 2, markerColor(e.align))
 		}
 	}
 

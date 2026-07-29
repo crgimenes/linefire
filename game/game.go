@@ -17,6 +17,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/effects"
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/level"
 	"github.com/crgimenes/linefire/procgen"
@@ -163,7 +164,7 @@ type Game struct {
 	arsenal      []int                    // catalog indices collected, in pickup order (arsenal.go)
 	slotArsIdx   [numSlots]int            // which arsenal weapon each slot points at (-1 = empty)
 	slots        [numSlots]weaponSlot     // the live weapon + cooldown in each slot
-	particles    []particle               // live cosmetic particles (explosions, pickups)
+	fx           *effects.Pool            // live cosmetic particles (explosions, pickups)
 	shocks       []shockwave              // live expanding blast rings
 	floaters     []floatText              // live floating damage numbers
 	numCache     map[string]*ebiten.Image // rendered text per string (lazy, reused)
@@ -1403,7 +1404,7 @@ func (g *Game) drawPortal(dst *ebiten.Image, cam ebiten.GeoM, e *entity) {
 		a := math.Sin(math.Pi * u) // fade in at the rim, out at the centre
 		mc := col
 		mc.A = uint8(235 * a)
-		fillCircle(dst, float64(px), float64(py), 1.6*sc, mc)
+		render.FillCircle(dst, float64(px), float64(py), 1.6*sc, mc)
 	}
 }
 

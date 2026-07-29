@@ -1,4 +1,4 @@
-package game
+package render
 
 import (
 	"image/color"
@@ -75,16 +75,16 @@ func buildAlphaTex(w, h int, dist func(x, y float64) float64) *ebiten.Image {
 	return img
 }
 
-// fillCircle draws a tinted disc of radius r (device px) centered at (cx, cy).
-func fillCircle(dst *ebiten.Image, cx, cy, r float64, col color.RGBA) {
+// FillCircle draws a tinted disc of radius r (device px) centered at (cx, cy).
+func FillCircle(dst *ebiten.Image, cx, cy, r float64, col color.RGBA) {
 	disc(dst, cx, cy, r, col, 1, ebiten.Blend{})
 }
 
-// fillCircleAdd is fillCircle with ADDITIVE blending, scaled by gain — the same
+// FillCircleAdd is FillCircle with ADDITIVE blending, scaled by gain — the same
 // light-adding draw the bolts use. Note that a caller fades an additive mark with
 // gain, NOT with the color's alpha: additive blending ignores the destination, so
 // a lower alpha alone would leave the mark just as bright.
-func fillCircleAdd(dst *ebiten.Image, cx, cy, r float64, col color.RGBA, gain float64) {
+func FillCircleAdd(dst *ebiten.Image, cx, cy, r float64, col color.RGBA, gain float64) {
 	disc(dst, cx, cy, r, col, gain, ebiten.BlendLighter)
 }
 
@@ -107,17 +107,17 @@ func disc(dst *ebiten.Image, cx, cy, r float64, col color.RGBA, gain float64, bl
 	dst.DrawImage(discTex, op)
 }
 
-// strokeLine draws a tinted straight streak of the given width (device px) from
+// StrokeLine draws a tinted straight streak of the given width (device px) from
 // (x0, y0) to (x1, y1), butt-capped like the vector StrokeLine it replaces.
-func strokeLine(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA) {
+func StrokeLine(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA) {
 	streak(dst, x0, y0, x1, y1, width, col, 1, ebiten.Blend{})
 }
 
-// strokeLineAdd is strokeLine with ADDITIVE blending, scaled by gain: the streak
+// StrokeLineAdd is StrokeLine with ADDITIVE blending, scaled by gain: the streak
 // adds light to whatever lies under it instead of covering it. That is how kutta
 // composites its glowing smoke, and it is what makes a mark read as hot — the
 // same stroke drawn over-and-over blows out to white where it overlaps.
-func strokeLineAdd(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA, gain float64) {
+func StrokeLineAdd(dst *ebiten.Image, x0, y0, x1, y1, width float64, col color.RGBA, gain float64) {
 	streak(dst, x0, y0, x1, y1, width, col, gain, ebiten.BlendLighter)
 }
 

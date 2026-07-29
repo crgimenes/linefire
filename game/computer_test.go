@@ -58,7 +58,7 @@ func TestLaserHeatLatchesAndCools(t *testing.T) {
 	if feedContains(g, "overheated") {
 		t.Fatal("the overheat must not narrate itself in the feed")
 	}
-	if len(g.particles) == 0 {
+	if g.fxPool().Len() == 0 {
 		t.Fatal("the beam cutting out should throw a puff of vapour")
 	}
 	if g.laserHeatFrac() < 1 {
