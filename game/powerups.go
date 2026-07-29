@@ -1,5 +1,7 @@
 package game
 
+import "github.com/crgimenes/linefire/weapon"
+
 // Power-up effect kinds (the level Spawn.Kind value).
 const (
 	powerHeal     = "heal"
@@ -51,6 +53,10 @@ func (g *Game) resolvePickups() {
 // applyPickup applies a power-up's effect to the player.
 func (g *Game) applyPickup(e *entity) {
 	g.playEvent(e.a, "pickup")
+	// Every power-up carries a charge: whatever else it does, collecting one is
+	// how the weapons get their energy back. That is what makes a pickup worth a
+	// detour once the heavy guns have been leaning on the pool.
+	g.energyPool().Add(weapon.PickupEnergy)
 	switch e.power {
 	case powerComputer:
 		g.hasComputer = true

@@ -121,6 +121,9 @@ func (g *Game) fireWeaponSlot(s int) {
 	if sl.cd > 0 {
 		return
 	}
+	if !g.payForShot(&sl.w) {
+		return // out of energy for anything this heavy; the front gun still works
+	}
 	if g.useWeapon(&sl.w, aim) {
 		sl.cd = cooldownForLevel(sl.w.Cooldown, g.rateLevel) // the fire-rate mod shortens it
 	}

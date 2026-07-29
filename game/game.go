@@ -215,19 +215,20 @@ type Game struct {
 	laserX1, laserY1 float64 // laser beam endpoint in world space
 	laserHitRock     bool    // the beam terminated on rock (so its tick melts it)
 
-	hasComputer        bool       // the combat computer was picked up (unlocks auto-fire)
-	fireLevel          int        // multishot upgrade level (fire-power pickups); fans direct shots
-	rateLevel          int        // fire-rate upgrade level (rate pickups); shortens cooldowns
-	damageLevel        int        // damage upgrade level (damage pickups); strengthens shots
-	seekLevel          int        // homing upgrade level (seek pickups); curves shots to enemies
-	allies             []ally     // friendly companions: escorts (formation) + drones (orbit)
-	orbitPhase         float64    // shared drone orbit angle, advanced each frame
-	bubbleTime         int        // frames of full damage immunity left (bubble shield mod)
-	reflectTime        int        // frames of shot reflection left (reflector shield mod)
-	checkpoint         checkpoint // last saved run snapshot (game-over R restores it)
-	autoFire           bool       // combat computer engaged (auto-aim + auto-fire aimed weapons)
-	autoAimX, autoAimY float64    // auto-fire target direction (unit) this frame
-	autoAimOK          bool       // a target was found this frame
+	hasComputer        bool        // the combat computer was picked up (unlocks auto-fire)
+	energy             weapon.Pool // ammunition: every weapon but the plain front gun draws on it
+	fireLevel          int         // multishot upgrade level (fire-power pickups); fans direct shots
+	rateLevel          int         // fire-rate upgrade level (rate pickups); shortens cooldowns
+	damageLevel        int         // damage upgrade level (damage pickups); strengthens shots
+	seekLevel          int         // homing upgrade level (seek pickups); curves shots to enemies
+	allies             []ally      // friendly companions: escorts (formation) + drones (orbit)
+	orbitPhase         float64     // shared drone orbit angle, advanced each frame
+	bubbleTime         int         // frames of full damage immunity left (bubble shield mod)
+	reflectTime        int         // frames of shot reflection left (reflector shield mod)
+	checkpoint         checkpoint  // last saved run snapshot (game-over R restores it)
+	autoFire           bool        // combat computer engaged (auto-aim + auto-fire aimed weapons)
+	autoAimX, autoAimY float64     // auto-fire target direction (unit) this frame
+	autoAimOK          bool        // a target was found this frame
 
 	// Laser heat: firing builds heat; at the cap the laser shuts off (laserHot)
 	// until it cools back to zero, so sitting on auto-fire is not a free win.
@@ -691,6 +692,7 @@ func (g *Game) Update() error {
 	}
 	g.updateDiscovery()
 	g.stepHorde()
+	g.energyPool().Tick() // the slow trickle back; a pickup is what refills it properly
 	g.stepProjectiles()
 	g.stepAllies()
 	g.updateEnemies()

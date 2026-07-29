@@ -1,6 +1,10 @@
 package game
 
-import "math"
+import (
+	"math"
+
+	"github.com/crgimenes/linefire/weapon"
+)
 
 // Combat mods are the bullet-hell power-ups that STACK over a run: each pickup
 // nudges a combat stat up — no menu, no slot, just fly over it (like the drop-swap
@@ -149,4 +153,55 @@ func (g *Game) addSeek() bool {
 	g.seekLevel++
 	g.logf("HOMING  %d", g.seekLevel)
 	return true
+}
+
+// powerLevel is how far the ship's shots have been upgraded: every stacked mod
+// counts, because every one of them makes the shot hit harder, reach further or
+// arrive faster. It is what the energy price is scaled by.
+func (g *Game) powerLevel() int {
+	return g.fireLevel + g.rateLevel + g.damageLevel + g.seekLevel
+}
+
+// stepDownMod drops one level off whichever mod is stacked highest, and reports
+// whether there was anything left to drop. A ship that cannot power its upgrades
+// gives one up and keeps firing, rather than falling silent: the plain shot at
+// level zero is free and always available.
+func (g *Game) stepDownMod() bool {
+	mods := []*int{&g.fireLevel, &g.damageLevel, &g.seekLevel, &g.rateLevel}
+	highest := mods[0]
+	for _, m := range mods[1:] {
+		if *m > *highest {
+			highest = m
+		}
+	}
+	if *highest <= 0 {
+		return false
+	}
+	*highest--
+	return true
+}
+
+// payForShot charges the pool for one use of w at the ship's current upgrade
+// level, stepping the upgrades down until the shot is affordable. It reports
+// whether the shot can go ahead: only a weapon whose own price is beyond an
+// empty pool is refused outright.
+func (g *Game) payForShot(w *weapon.Weapon) bool {
+	pool := g.energyPool()
+	for !pool.Spend(weapon.Cost(*w, g.powerLevel())) {
+		if !g.stepDownMod() {
+			return false
+		}
+		g.logf("POWER   energy low: dropped an upgrade level")
+	}
+	return true
+}
+
+// energyPool returns the ship's ammunition, filling it on first use so a zero
+// Game — which the tests build directly — starts with a full pool rather than an
+// empty one that refuses every heavy weapon.
+func (g *Game) energyPool() *weapon.Pool {
+	if g.energy.Max == 0 {
+		g.energy = weapon.NewPool(0)
+	}
+	return &g.energy
 }
