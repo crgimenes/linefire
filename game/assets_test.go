@@ -7,6 +7,7 @@ import (
 
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/ship"
 )
 
 // TestShippedGameAssetsLoadAndValidate guards the files in gameassets/: the
@@ -64,9 +65,8 @@ func TestEnemyArchetypeAssetsLoad(t *testing.T) {
 		if a.Kind != kind {
 			t.Fatalf("%s asset kind = %q, want %q", kind, a.Kind, kind)
 		}
-		_, ok := enemyArchetypes[kind]
-		if !ok {
-			t.Fatalf("no archetype registered for %q", kind)
+		if ship.For(kind).Kind != kind {
+			t.Fatalf("no profile registered for %q", kind)
 		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
 	"github.com/crgimenes/linefire/render"
+	"github.com/crgimenes/linefire/ship"
 )
 
 // entityKind classifies a runtime actor.
@@ -63,12 +64,12 @@ type entity struct {
 
 const (
 	// enemyHP is how many bullet hits an enemy takes before it is destroyed.
-	enemyHP = 3
+	enemyHP = ship.BaseHP
 	// hitFlashFrames is how long an enemy's white impact flash lingers.
 	hitFlashFrames = 6
 	// radarRange is how close (world units) the player must be for an enemy to
 	// engage; outside it the enemy stays idle.
-	radarRange = 320
+	radarRange = ship.BaseRadar
 	// radarHitBoost grows an enemy's engage range each time it is hit, so it
 	// retaliates against fire from beyond its normal radar instead of being picked
 	// off from afar. radarMaxMul caps the growth as a multiple of the base radar.
@@ -80,17 +81,17 @@ const (
 
 	// Movement when engaged: approach to a standoff distance and orbit there
 	// (close enough to threaten, far enough not to sit on the player).
-	enemySpeed        = 1.8  // world units per frame
-	enemyStandoff     = 90   // preferred distance from the player
-	enemyStandoffBand = 24   // deadband around the standoff where it holds position
-	enemyOrbit        = 0.9  // tangential weight relative to the radial approach
-	enemySepDist      = 64   // enemies closer than this push each other apart
-	enemySepWeight    = 1.2  // strength of that separation in the steering mix
-	repathInterval    = 18   // frames between A* recomputations while pursuing
-	stuckEps          = 0.3  // movement below this per frame counts as no progress
-	stuckLimit        = 8    // frames of no progress before forcing an unstick
-	velSmooth         = 0.25 // how fast the steering velocity follows the target (inertia)
-	enemyTurnRate     = 8.0  // max degrees the enemy turns per frame (no snap-spinning)
+	enemySpeed        = 1.8               // world units per frame
+	enemyStandoff     = ship.BaseStandoff // preferred distance from the player
+	enemyStandoffBand = 24                // deadband around the standoff where it holds position
+	enemyOrbit        = 0.9               // tangential weight relative to the radial approach
+	enemySepDist      = 64                // enemies closer than this push each other apart
+	enemySepWeight    = 1.2               // strength of that separation in the steering mix
+	repathInterval    = 18                // frames between A* recomputations while pursuing
+	stuckEps          = 0.3               // movement below this per frame counts as no progress
+	stuckLimit        = 8                 // frames of no progress before forcing an unstick
+	velSmooth         = 0.25              // how fast the steering velocity follows the target (inertia)
+	enemyTurnRate     = 8.0               // max degrees the enemy turns per frame (no snap-spinning)
 
 	patrolSpeed     = 0.7 // world units per frame while idle/wandering
 	patrolHold      = 90  // frames an enemy commits to a heading before changing it
@@ -115,38 +116,10 @@ func spawnEntityKind(category string) entityKind {
 	}
 }
 
-// enemyArchetype is the per-type stat/behavior profile chosen by an enemy asset's
-// Kind. The plain "enemy" grunt is the baseline; the others trade speed, health,
-// range and firepower so the player's weapons each find a use.
-type enemyArchetype struct {
-	hp         int
-	radar      float64 // base engage/detect range
-	fireEvery  int     // frames between shots (<=0 falls back to the baseline rate)
-	shotDmg    int     // damage to the player per shot
-	shotSpeed  float64 // projectile speed
-	speedMul   float64 // movement-speed multiplier (ignored when stationary)
-	standoff   float64 // preferred orbit distance
-	stationary bool    // never moves (turret): only faces and fires
-}
-
-// enemyArchetypes maps an enemy asset's Kind to its profile; an unknown enemy Kind
-// falls back to the grunt. Turret = stationary heavy gun, rusher = fast melee,
-// sniper = long-range glass cannon, tank = slow bullet sponge.
-var enemyArchetypes = map[string]enemyArchetype{
-	"enemy":  {hp: enemyHP, radar: radarRange, fireEvery: enemyFireInterval, shotDmg: enemyBulletDamage, shotSpeed: enemyBulletSpeed, speedMul: 1, standoff: enemyStandoff},
-	"turret": {hp: 6, radar: radarRange * 1.5, fireEvery: 40, shotDmg: 16, shotSpeed: enemyBulletSpeed * 1.25, speedMul: 0, standoff: 0, stationary: true},
-	"rusher": {hp: 2, radar: radarRange, fireEvery: 240, shotDmg: enemyBulletDamage, shotSpeed: enemyBulletSpeed, speedMul: 1.9, standoff: 24},
-	"sniper": {hp: 2, radar: radarRange * 1.8, fireEvery: 110, shotDmg: 32, shotSpeed: enemyBulletSpeed * 1.9, speedMul: 0.9, standoff: enemyStandoff * 2.2},
-	"tank":   {hp: 10, radar: radarRange, fireEvery: 70, shotDmg: 22, shotSpeed: enemyBulletSpeed, speedMul: 0.5, standoff: enemyStandoff},
-}
-
-// archetypeFor returns the profile for an enemy Kind, defaulting to the grunt.
-func archetypeFor(kind string) enemyArchetype {
-	a, ok := enemyArchetypes[kind]
-	if ok {
-		return a
-	}
-	return enemyArchetypes["enemy"]
+// archetypeFor returns the profile for an enemy Kind. The table itself lives in
+// the ship package, shared with Linefire Skirmish, which fields the same types.
+func archetypeFor(kind string) ship.Profile {
+	return ship.For(kind)
 }
 
 // moveSpeed is the enemy's per-frame movement speed: the base scaled by its
@@ -172,20 +145,20 @@ func buildEntities(content fs.FS, l *level.Level, dir string) []entity {
 	var es []entity
 	add := func(kind entityKind, s level.Spawn) {
 		a, m, gm := load(s.Asset)
-		var arch enemyArchetype
+		var arch ship.Profile
 		if kind == kindEnemy {
 			arch = archetypeFor(s.Kind)
 		}
 		hp := 0
 		if kind == kindEnemy {
-			hp = arch.hp
+			hp = arch.HP
 		}
 		if kind == kindPowerUp || kind == kindWeapon {
 			hp = pickupHP // breakable by deliberate player fire
 		}
 		radar := 0.0
 		if kind == kindEnemy {
-			radar = arch.radar
+			radar = arch.Radar
 		}
 		power := ""
 		if kind == kindPowerUp {
@@ -213,8 +186,8 @@ func buildEntities(content fs.FS, l *level.Level, dir string) []entity {
 		es = append(es, entity{
 			kind: kind, align: align, x: s.X, y: s.Y, angle: s.Angle,
 			hp: hp, radar: radar, power: power, target: target,
-			stationary: arch.stationary, fireEvery: arch.fireEvery,
-			shotDmg: arch.shotDmg, shotSpeed: arch.shotSpeed, speedMul: arch.speedMul,
+			stationary: arch.Stationary, fireEvery: arch.FireEvery,
+			shotDmg: arch.ShotDamage, shotSpeed: arch.ShotSpeed, speedMul: arch.SpeedMul,
 			a: a, mesh: m, glowMesh: gm, radius: assetRadius(a),
 		})
 	}
@@ -234,7 +207,7 @@ func buildEntities(content fs.FS, l *level.Level, dir string) []entity {
 		if i%2 == 1 {
 			e.orbitDir = -1.0
 		}
-		e.standoff = archetypeFor(s.Kind).standoff * (0.8 + randFloat()*0.5)
+		e.standoff = archetypeFor(s.Kind).Standoff * (0.8 + randFloat()*0.5)
 		e.wanderHead = s.Angle * math.Pi / 180
 	}
 	return es

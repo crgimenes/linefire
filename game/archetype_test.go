@@ -5,6 +5,7 @@ import (
 
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/ship"
 )
 
 func TestEnemyArchetypeFromKind(t *testing.T) {
@@ -30,14 +31,14 @@ func TestEnemyArchetypeFromKind(t *testing.T) {
 	if !es[1].stationary {
 		t.Fatal("the turret should be stationary")
 	}
-	if es[1].hp != enemyArchetypes["turret"].hp {
-		t.Fatalf("turret hp = %d, want %d", es[1].hp, enemyArchetypes["turret"].hp)
+	if es[1].hp != ship.For("turret").HP {
+		t.Fatalf("turret hp = %d, want %d", es[1].hp, ship.For("turret").HP)
 	}
-	if es[2].speedMul != enemyArchetypes["rusher"].speedMul {
-		t.Fatalf("rusher speedMul = %v, want %v", es[2].speedMul, enemyArchetypes["rusher"].speedMul)
+	if es[2].speedMul != ship.For("rusher").SpeedMul {
+		t.Fatalf("rusher speedMul = %v, want %v", es[2].speedMul, ship.For("rusher").SpeedMul)
 	}
-	if es[3].hp != enemyArchetypes["tank"].hp {
-		t.Fatalf("tank hp = %d, want %d", es[3].hp, enemyArchetypes["tank"].hp)
+	if es[3].hp != ship.For("tank").HP {
+		t.Fatalf("tank hp = %d, want %d", es[3].hp, ship.For("tank").HP)
 	}
 }
 

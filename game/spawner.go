@@ -192,11 +192,11 @@ func enemyEntity(kind string, a *asset.Asset, mesh, glow *render.Mesh, x, y, ang
 	}
 	return entity{
 		kind: kindEnemy, align: alignBad, x: x, y: y, angle: angle,
-		hp: arch.hp, radar: arch.radar,
-		stationary: arch.stationary, fireEvery: arch.fireEvery,
-		shotDmg: arch.shotDmg, shotSpeed: arch.shotSpeed, speedMul: arch.speedMul,
+		hp: arch.HP, radar: arch.Radar,
+		stationary: arch.Stationary, fireEvery: arch.FireEvery,
+		shotDmg: arch.ShotDamage, shotSpeed: arch.ShotSpeed, speedMul: arch.SpeedMul,
 		a: a, mesh: mesh, glowMesh: glow, radius: assetRadius(a),
-		standoff:   arch.standoff * (0.8 + randFloat()*0.5),
+		standoff:   arch.Standoff * (0.8 + randFloat()*0.5),
 		wanderHead: angle * math.Pi / 180,
 		orbitDir:   orbit,
 		spawn:      -1,

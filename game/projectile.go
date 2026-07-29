@@ -9,6 +9,7 @@ import (
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/effects"
 	"github.com/crgimenes/linefire/render"
+	"github.com/crgimenes/linefire/ship"
 )
 
 const (
@@ -44,10 +45,10 @@ const (
 	impactShakeBase    = 0.6 // shake when a shot connects with an enemy
 	impactShakePerDmg  = 0.5 // extra shake per point of damage
 
-	enemyBulletSpeed  = 5.0 // world units per frame, aimed at the player
-	enemyBulletLife   = 150 // frames
-	enemyFireInterval = 90  // frames between an enemy's shots
-	enemyBulletDamage = 20  // health lost when an enemy shot connects
+	enemyBulletSpeed  = ship.BaseShotSpeed  // world units per frame, aimed at the player
+	enemyBulletLife   = 150                 // frames
+	enemyFireInterval = ship.BaseFireEvery  // frames between an enemy's shots
+	enemyBulletDamage = ship.BaseShotDamage // health lost when an enemy shot connects
 )
 
 var (
