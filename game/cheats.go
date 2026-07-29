@@ -3,6 +3,7 @@ package game
 import (
 	"strings"
 
+	"github.com/crgimenes/linefire/weapon"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -53,7 +54,7 @@ func (g *Game) grantFullArsenal() {
 	g.fireLevel, g.rateLevel, g.damageLevel, g.seekLevel = maxFireLevel, maxRateLevel, maxDamageLevel, maxSeekLevel
 	g.hasComputer, g.autoFire = true, true
 
-	for cat := range weaponCatalog {
+	for cat := range weapon.Catalog {
 		g.collectWeapon(cat) // every weapon into the arsenal
 	}
 	g.devourerAmmo = devourerCharges * 3    // the DEVOURER is charge-based: stock it, or it reads "no charge"

@@ -1,5 +1,7 @@
 package game
 
+import "github.com/crgimenes/linefire/weapon"
+
 // Weapon pickups keep the game moving: a weapon lies on the map (a colored diamond);
 // flying over it COLLECTS it into the arsenal (arsenal.go), arming the first empty slot,
 // no dropping and no screen. Nothing is ever swapped out — the only decision is the
@@ -8,11 +10,11 @@ package game
 // weaponKeys names each catalog weapon for data (asset kinds "weapon-<key>", entity
 // power, drops).
 var weaponKeys = [...]string{
-	catFront:    "front",
-	catMissile:  "missile",
-	catMine:     "mine",
-	catLaser:    "laser",
-	catDevourer: "devourer",
+	weapon.CatFront:    "front",
+	weapon.CatMissile:  "missile",
+	weapon.CatMine:     "mine",
+	weapon.CatLaser:    "laser",
+	weapon.CatDevourer: "devourer",
 }
 
 // catForKey resolves a weapon key back to its catalog index, or -1.
@@ -52,7 +54,7 @@ func (g *Game) resolveWeaponPickups() {
 		isNew := g.collectWeapon(cat)
 		// The DEVOURER is charge-based: every pickup grants charges and is consumed, even a
 		// refill of one already owned. Ordinary weapons already owned are left on the map.
-		if cat == catDevourer {
+		if cat == weapon.CatDevourer {
 			g.devourerAmmo += devourerCharges
 			g.logf("PICKUP  ► DEVOURER ONLINE // %d charges", g.devourerAmmo)
 		} else if !isNew {

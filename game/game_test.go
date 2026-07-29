@@ -6,6 +6,7 @@ import (
 
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 func TestAssetRadius(t *testing.T) {
@@ -114,7 +115,7 @@ func TestLogicalSizeDefaultsAndOverride(t *testing.T) {
 }
 
 func TestMenuOriginCentersOnWindow(t *testing.T) {
-	g := &Game{winW: 1000, winH: 600, arsenal: []int{catFront, catMissile}, slotArsIdx: [numSlots]int{0, 1}}
+	g := &Game{winW: 1000, winH: 600, arsenal: []int{weapon.CatFront, weapon.CatMissile}, slotArsIdx: [numSlots]int{0, 1}}
 	g.syncSlots()
 	mx, my := g.menuOrigin()
 	// The panel's top-left is the origin; its (estimated) center should sit at the

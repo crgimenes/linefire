@@ -5,6 +5,7 @@ import (
 
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 func TestComputerPickupUnlocksAutoFire(t *testing.T) {
@@ -66,7 +67,7 @@ func TestLaserHeatLatchesAndCools(t *testing.T) {
 	}
 
 	// While hot, the slot refuses to fire the laser.
-	g.arsenal = []int{catLaser}
+	g.arsenal = []int{weapon.CatLaser}
 	g.slotArsIdx = [numSlots]int{0, -1}
 	g.syncSlots()
 	g.laserOn = false

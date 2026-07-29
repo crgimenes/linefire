@@ -3,6 +3,8 @@ package game
 import (
 	"fmt"
 	"slices"
+
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // The arsenal is everything the player has collected, in pickup order — no mounts, no
@@ -21,7 +23,7 @@ const numSlots = 2
 // initArsenal launches the ship with the front gun live in slot 1 and slot 2 empty
 // (armed once a second weapon is collected and cycled to).
 func (g *Game) initArsenal() {
-	g.arsenal = []int{catFront}
+	g.arsenal = []int{weapon.CatFront}
 	g.slotArsIdx = [numSlots]int{0, -1}
 	g.syncSlots()
 }
@@ -34,7 +36,7 @@ func (g *Game) syncSlots() {
 			g.slots[s] = weaponSlot{}
 			continue
 		}
-		g.slots[s] = weaponSlot{w: weaponCatalog[g.arsenal[i]], filled: true}
+		g.slots[s] = weaponSlot{w: weapon.Catalog[g.arsenal[i]], filled: true}
 	}
 }
 
@@ -49,7 +51,7 @@ func (g *Game) hasWeapon(cat int) bool {
 // slots are full it just joins the collection, ready to be cycled in. A duplicate is
 // ignored. Reports whether it was new.
 func (g *Game) collectWeapon(cat int) bool {
-	if cat < 0 || cat >= len(weaponCatalog) || g.hasWeapon(cat) {
+	if cat < 0 || cat >= len(weapon.Catalog) || g.hasWeapon(cat) {
 		return false
 	}
 	g.arsenal = append(g.arsenal, cat)
@@ -95,11 +97,11 @@ func (g *Game) tickWeapons() {
 // always shoots FORWARD, the secondary (slot 1) toward the cursor/target. So whatever you
 // cycle into a slot behaves the same way — a laser in the primary is a forward beam, a
 // front gun in the secondary is an aimed fan. A mine ignores aim regardless.
-func slotAim(s int) aimMode {
+func slotAim(s int) weapon.Aim {
 	if s == 0 {
-		return aimForward
+		return weapon.AimForward
 	}
-	return aimMouse
+	return weapon.AimCursor
 }
 
 // fireWeaponSlot fires the weapon live in slot s (its button is held): the laser is
@@ -110,7 +112,7 @@ func (g *Game) fireWeaponSlot(s int) {
 	}
 	sl := &g.slots[s]
 	aim := slotAim(s)
-	if sl.w.kind == wkLaser {
+	if sl.w.Kind == weapon.KindLaser {
 		if g.laserHot {
 			return // overheated: the beam stays off until it cools
 		}
@@ -120,7 +122,7 @@ func (g *Game) fireWeaponSlot(s int) {
 		return
 	}
 	if g.useWeapon(&sl.w, aim) {
-		sl.cd = cooldownForLevel(sl.w.cooldown, g.rateLevel) // the fire-rate mod shortens it
+		sl.cd = cooldownForLevel(sl.w.Cooldown, g.rateLevel) // the fire-rate mod shortens it
 	}
 }
 
@@ -138,7 +140,7 @@ func (g *Game) slotLine() string {
 	line := "1:" + g.slotWeaponName(0) + "  2:" + g.slotWeaponName(1)
 	holdsLaser := false
 	for s := range g.slots {
-		if g.slots[s].filled && g.slots[s].w.kind == wkLaser {
+		if g.slots[s].filled && g.slots[s].w.Kind == weapon.KindLaser {
 			holdsLaser = true
 		}
 	}
@@ -150,7 +152,7 @@ func (g *Game) slotLine() string {
 			line += fmt.Sprintf("   HEAT %d%%", g.laserHeat*100/laserHeatMax)
 		}
 	}
-	if g.hasWeapon(catDevourer) {
+	if g.hasWeapon(weapon.CatDevourer) {
 		line += fmt.Sprintf("   DEV x%d", g.devourerAmmo)
 	}
 	return line

@@ -1,10 +1,14 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crgimenes/linefire/weapon"
+)
 
 func TestFireSetsShotPayload(t *testing.T) {
 	g := &Game{} // nil player: muzzleWorld falls back to the ship position
-	g.fireProjectileWeapon(&weaponFrontGun, aimForward)
+	g.fireProjectileWeapon(&weapon.Catalog[weapon.CatFront], weapon.AimForward)
 	if len(g.projectiles) != 1 {
 		t.Fatalf("firing the front gun should spawn one bullet, got %d", len(g.projectiles))
 	}
@@ -18,18 +22,18 @@ func TestFireSetsShotPayload(t *testing.T) {
 func TestExplodeFalloffDamagesByDistance(t *testing.T) {
 	g := &Game{}
 	g.entities = []entity{
-		{kind: kindEnemy, x: 0, y: 0, radius: 3, hp: 99},                 // center: full damage
-		{kind: kindEnemy, x: missileRadius / 2, y: 0, radius: 3, hp: 99}, // half radius: ~half
-		{kind: kindEnemy, x: missileRadius * 2, y: 0, radius: 3, hp: 99}, // out of range: untouched
+		{kind: kindEnemy, x: 0, y: 0, radius: 3, hp: 99},                                         // center: full damage
+		{kind: kindEnemy, x: weapon.Catalog[weapon.CatMissile].AOE / 2, y: 0, radius: 3, hp: 99}, // half radius: ~half
+		{kind: kindEnemy, x: weapon.Catalog[weapon.CatMissile].AOE * 2, y: 0, radius: 3, hp: 99}, // out of range: untouched
 	}
 
-	g.explodeAt(0, 0, missileDamage, missileRadius, missileDamageColor)
+	g.explodeAt(0, 0, weapon.Catalog[weapon.CatMissile].Damage, weapon.Catalog[weapon.CatMissile].AOE, missileDamageColor)
 
 	center := 99 - g.entities[0].hp
 	mid := 99 - g.entities[1].hp
 	far := 99 - g.entities[2].hp
-	if center != missileDamage {
-		t.Fatalf("center enemy should take full %d, took %d", missileDamage, center)
+	if center != weapon.Catalog[weapon.CatMissile].Damage {
+		t.Fatalf("center enemy should take full %d, took %d", weapon.Catalog[weapon.CatMissile].Damage, center)
 	}
 	if mid <= 0 || mid >= center {
 		t.Fatalf("mid enemy should take partial damage (0 < %d < %d)", mid, center)
@@ -56,7 +60,7 @@ func TestMissileShotDetonatesOnEnemy(t *testing.T) {
 	}
 	g.projectiles = []projectile{{
 		x: 0, y: 0, vx: bulletSpeed, vy: 0, life: bulletLife,
-		dmg: missileDamage, col: missileDamageColor, aoe: missileRadius,
+		dmg: weapon.Catalog[weapon.CatMissile].Damage, col: missileDamageColor, aoe: weapon.Catalog[weapon.CatMissile].AOE,
 	}}
 
 	g.stepProjectiles()

@@ -3,6 +3,8 @@ package game
 import (
 	"math"
 	"testing"
+
+	"github.com/crgimenes/linefire/weapon"
 )
 
 func TestShotsForLevelAndSpread(t *testing.T) {
@@ -106,7 +108,7 @@ func TestMultishotFansDirectWeaponButNotMissile(t *testing.T) {
 	g := &Game{angle: -90}
 	g.fireLevel = 2 // -> 3 shots
 
-	g.fireProjectileWeapon(&weaponFrontGun, aimForward)
+	g.fireProjectileWeapon(&weapon.Catalog[weapon.CatFront], weapon.AimForward)
 	if len(g.projectiles) != 3 {
 		t.Fatalf("a direct weapon at fire level 2 should fan 3 shots, got %d", len(g.projectiles))
 	}
@@ -115,7 +117,7 @@ func TestMultishotFansDirectWeaponButNotMissile(t *testing.T) {
 	}
 
 	g.projectiles = nil
-	g.fireProjectileWeapon(&weaponMissile, aimForward) // aoe > 0
+	g.fireProjectileWeapon(&weapon.Catalog[weapon.CatMissile], weapon.AimForward) // aoe > 0
 	if len(g.projectiles) != 1 {
 		t.Fatalf("an AoE weapon must still fire a single shot, got %d", len(g.projectiles))
 	}

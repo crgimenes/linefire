@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // TestGodModeBlocksDamage: iddqd makes the ship take no damage, so a tester can fly
@@ -105,7 +106,7 @@ func TestFullArsenalCollectsEveryWeapon(t *testing.T) {
 
 	g.grantFullArsenal()
 
-	for cat := range weaponCatalog {
+	for cat := range weapon.Catalog {
 		if !g.hasWeapon(cat) {
 			t.Fatalf("idkfa must collect weapon %d", cat)
 		}

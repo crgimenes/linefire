@@ -5,11 +5,12 @@ import (
 
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 func TestSaveCheckpointClonesRun(t *testing.T) {
 	g := &Game{mapName: "m1", health: 42, fireLevel: 2, lives: 3}
-	g.arsenal = []int{catFront, catLaser}
+	g.arsenal = []int{weapon.CatFront, weapon.CatLaser}
 	z := level.Zone{Kind: level.ZoneCircle, Points: []asset.Point{{X: 100, Y: 200}}, Radius: 10, Trigger: triggerCheckpoint}
 
 	g.saveCheckpoint(z)
@@ -22,9 +23,9 @@ func TestSaveCheckpointClonesRun(t *testing.T) {
 	}
 
 	// Mutating the live run must not change the stored snapshot (it is a clone).
-	g.arsenal[0] = catMine
+	g.arsenal[0] = weapon.CatMine
 	g.fireLevel = 4
-	if g.checkpoint.arsenal[0] != catFront {
+	if g.checkpoint.arsenal[0] != weapon.CatFront {
 		t.Fatal("checkpoint arsenal must be a clone, not a shared slice")
 	}
 	if g.checkpoint.fireLevel != 2 {

@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/crgimenes/linefire/render"
+	"github.com/crgimenes/linefire/weapon"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -12,11 +13,8 @@ const (
 	// Heat: firing the beam builds heat each frame; at the cap it shuts off until
 	// fully cooled (hysteresis), so parking the laser on auto-fire has a rhythm —
 	// roughly 4s of burn, 2s of forced cooldown.
-	laserHeatMax   = 240
-	laserCoolRate  = 2
-	laserRange     = 2000 // max beam length, world units — reaches clear across the (large) screen to a wall; the raymarch stops at the first rock, so a long reach is cheap
-	laserTickEvery = 4    // frames between damage ticks while the beam is held
-	laserDamage    = 1    // damage per tick to every enemy the beam crosses
+	laserHeatMax  = 240
+	laserCoolRate = 2
 	// The beam MELTS rock instead of biting it: a small nibble on every damage tick
 	// (15/s) rather than one big crater. Slow to breach a wall, but it never stops —
 	// hold it long enough and it bores a clean bore-hole.
@@ -34,9 +32,8 @@ const (
 )
 
 var (
-	laserColor       = color.RGBA{0xe0, 0xff, 0xe0, 0xff} // bright green-white core
-	laserGlowColor   = color.RGBA{0x40, 0xff, 0x60, 0xff} // green halo
-	laserDamageColor = color.RGBA{0x90, 0xff, 0x90, 0xff} // green damage numbers
+	laserColor     = color.RGBA{0xe0, 0xff, 0xe0, 0xff} // bright green-white core
+	laserGlowColor = color.RGBA{0x40, 0xff, 0x60, 0xff} // green halo
 )
 
 // stepLaserHeat runs the beam's thermal model once per frame: firing heats, rest
@@ -66,9 +63,9 @@ func (g *Game) stepLaserHeat() {
 // range), and flags it for drawing this frame. aim picks the direction: forward
 // along the heading (a key-bound mount) or toward the cursor/target (a mouse mount).
 // Called every frame the laser is held, so the beam is continuous.
-func (g *Game) aimLaser(w *weapon, aim aimMode) {
+func (g *Game) aimLaser(w *weapon.Weapon, aim weapon.Aim) {
 	var dx, dy float64
-	if aim == aimMouse {
+	if aim == weapon.AimCursor {
 		adx, ady, ok := g.weaponAimDir()
 		if !ok {
 			return
@@ -78,7 +75,7 @@ func (g *Game) aimLaser(w *weapon, aim aimMode) {
 		rad := g.angle * math.Pi / 180
 		dx, dy = math.Cos(rad), math.Sin(rad)
 	}
-	g.laserX1, g.laserY1, g.laserHitRock = g.laserEndpoint(g.x, g.y, dx, dy, w.reach)
+	g.laserX1, g.laserY1, g.laserHitRock = g.laserEndpoint(g.x, g.y, dx, dy, w.Reach)
 	g.laserOn = true
 }
 
@@ -113,7 +110,7 @@ func (g *Game) laserEndpoint(x, y, dx, dy, reach float64) (float64, float64, boo
 // all (the whole point of a laser). Called by useWeapon on the slot's cooldown, so
 // damage lands in ticks. Enemies are walked back-to-front because damageEnemy
 // removes the ones it kills.
-func (g *Game) fireLaserTick(w *weapon) bool {
+func (g *Game) fireLaserTick(w *weapon.Weapon) bool {
 	if !g.laserOn {
 		return false
 	}
@@ -126,7 +123,7 @@ func (g *Game) fireLaserTick(w *weapon) bool {
 		}
 		e := &g.entities[i]
 		if distPointSegmentSq(e.x, e.y, g.x, g.y, g.laserX1, g.laserY1) <= e.radius*e.radius {
-			g.damageEnemy(i, damageForLevel(w.damage, g.damageLevel), w.col)
+			g.damageEnemy(i, damageForLevel(w.Damage, g.damageLevel), w.Col)
 		}
 	}
 	return true

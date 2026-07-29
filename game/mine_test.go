@@ -1,20 +1,24 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crgimenes/linefire/weapon"
+)
 
 func TestDeployMineRespectsCap(t *testing.T) {
 	g := &Game{}
-	for range maxMines + 3 {
-		g.deployMineWeapon(&weaponMine)
+	for range weapon.Catalog[weapon.CatMine].MaxLive + 3 {
+		g.deployMineWeapon(&weapon.Catalog[weapon.CatMine])
 	}
-	if len(g.mines) != maxMines {
-		t.Fatalf("mines should be capped at %d, got %d", maxMines, len(g.mines))
+	if len(g.mines) != weapon.Catalog[weapon.CatMine].MaxLive {
+		t.Fatalf("mines should be capped at %d, got %d", weapon.Catalog[weapon.CatMine].MaxLive, len(g.mines))
 	}
 }
 
 func TestMineArmsThenDetonatesOnProximity(t *testing.T) {
 	g := &Game{}
-	g.deployMineWeapon(&weaponMine)
+	g.deployMineWeapon(&weapon.Catalog[weapon.CatMine])
 	if len(g.mines) != 1 || g.mines[0].arm <= 0 {
 		t.Fatalf("a fresh mine should be arming, got %+v", g.mines)
 	}
@@ -30,8 +34,8 @@ func TestMineArmsThenDetonatesOnProximity(t *testing.T) {
 	}
 
 	// Run out the arming delay with the enemy out of range, so it just arms.
-	g.entities[0].x = mineTriggerRadius * 4
-	for range mineArmFrames {
+	g.entities[0].x = weapon.Catalog[weapon.CatMine].TriggerRadius * 4
+	for range weapon.Catalog[weapon.CatMine].ArmFrames {
 		g.stepMines()
 	}
 	if len(g.mines) != 1 || g.mines[0].arm != 0 {
@@ -54,11 +58,11 @@ func TestMineArmsThenDetonatesOnProximity(t *testing.T) {
 
 func TestArmedMineIgnoresDistantEnemy(t *testing.T) {
 	g := &Game{}
-	g.deployMineWeapon(&weaponMine)
-	for range mineArmFrames {
+	g.deployMineWeapon(&weapon.Catalog[weapon.CatMine])
+	for range weapon.Catalog[weapon.CatMine].ArmFrames {
 		g.stepMines() // arm it with no enemies around
 	}
-	g.entities = []entity{{kind: kindEnemy, x: mineTriggerRadius * 3, y: 0, radius: 3, hp: 99}}
+	g.entities = []entity{{kind: kindEnemy, x: weapon.Catalog[weapon.CatMine].TriggerRadius * 3, y: 0, radius: 3, hp: 99}}
 	g.stepMines()
 	if len(g.mines) != 1 {
 		t.Fatal("an armed mine should not detonate for an out-of-range enemy")

@@ -5,6 +5,7 @@ import (
 
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/level"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // TestFlyingOverWeaponCollectsIt: a weapon on the ground joins the arsenal and arms the
@@ -16,7 +17,7 @@ func TestFlyingOverWeaponCollectsIt(t *testing.T) {
 
 	g.resolveWeaponPickups()
 
-	if !g.hasWeapon(catLaser) {
+	if !g.hasWeapon(weapon.CatLaser) {
 		t.Fatalf("flying over the laser should collect it, arsenal=%v", g.arsenal)
 	}
 	if g.slotWeaponName(1) != "laser" {

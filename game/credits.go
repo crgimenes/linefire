@@ -8,6 +8,7 @@ import (
 
 	"github.com/crgimenes/linefire/level"
 	"github.com/crgimenes/linefire/procgen"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // The credits screen is the game running ITSELF (an indestructible, auto-piloted,
@@ -120,7 +121,7 @@ func (g *Game) buildCreditsArena() {
 
 	// Basic loadout: front gun (slot 0) + laser turret (slot 1) + fire computer. Weaker than the
 	// old maxed spectacle, so it stops chewing every wall to rubble.
-	g.collectWeapon(catLaser)
+	g.collectWeapon(weapon.CatLaser)
 	g.slotArsIdx[0], g.slotArsIdx[1] = 0, 1
 	g.syncSlots()
 	g.hasComputer, g.autoFire = true, true

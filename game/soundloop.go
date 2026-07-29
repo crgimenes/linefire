@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/audio"
 
 	"github.com/crgimenes/linefire/sfx"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // Continuous sounds (the thruster hum, the laser beam) loop while their state is
@@ -93,5 +94,5 @@ func (b *soundBank) stopLoops() {
 func (g *Game) updateLoops(thrusting bool) {
 	req, ok := resolveEvent(g.player, "thruster")
 	g.sfx.setLoop("thruster", req, thrusting && ok)
-	g.sfx.setLoop("beam", weaponLaser.fire, g.laserOn)
+	g.sfx.setLoop("beam", soundOf(weapon.Catalog[weapon.CatLaser].Fire), g.laserOn)
 }

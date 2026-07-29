@@ -12,6 +12,7 @@ import (
 	"github.com/crgimenes/linefire/config"
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/sfx"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // Sound is synthesized with gion (a library, not files): each effect is a small
@@ -178,9 +179,15 @@ func renderVariations(base string, seed int64) [][]byte {
 	return sfx.Variations(base, seed)
 }
 
+// soundOf converts a weapon's fire recipe into a sound request. The weapon
+// package names the recipe; playing it is this game's business.
+func soundOf(s weapon.Sound) soundReq {
+	return soundReq{base: s.Base, seed: s.Seed, vol: s.Volume}
+}
+
 // prewarm renders the common sounds (event fallbacks + weapon fires) up front, so a
 // fight does not hitch rendering them on the first shot or explosion.
-func (b *soundBank) prewarm(weapons []weapon) {
+func (b *soundBank) prewarm(weapons []weapon.Weapon) {
 	if b == nil {
 		return
 	}
@@ -188,8 +195,8 @@ func (b *soundBank) prewarm(weapons []weapon) {
 		b.variationsFor(r.base, r.seed)
 	}
 	for i := range weapons {
-		if weapons[i].fire.base != "" {
-			b.variationsFor(weapons[i].fire.base, weapons[i].fire.seed)
+		if weapons[i].Fire.Base != "" {
+			b.variationsFor(weapons[i].Fire.Base, weapons[i].Fire.Seed)
 		}
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/crgimenes/linefire/level"
 	"github.com/crgimenes/linefire/procgen"
 	"github.com/crgimenes/linefire/render"
+	"github.com/crgimenes/linefire/weapon"
 
 	ui "github.com/crgimenes/minigui"
 )
@@ -499,7 +500,7 @@ func Run(content fs.FS, player *asset.Asset, lvl *level.Level, mapDir, mapName s
 			g.sfx.muted = cfg.Muted
 			g.sfx.highScore = cfg.HighScore
 		}
-		g.sfx.prewarm(weaponCatalog)
+		g.sfx.prewarm(weapon.Catalog)
 		g.prewarmMusic()
 	}
 	g.logf("TIP  salvage a combat computer to unlock auto-fire (G)")
@@ -786,7 +787,7 @@ func (g *Game) readManualInput() bool {
 // black hole per PRESS (justPressed) — so a held button never spams "no charge" nor auto-burns
 // a charge after each collapse; every other weapon keeps firing while the button is held.
 func (g *Game) fireSlotInput(s int, justPressed bool) {
-	if g.slots[s].filled && g.slots[s].w.kind == wkDevourer {
+	if g.slots[s].filled && g.slots[s].w.Kind == weapon.KindDevourer {
 		if justPressed {
 			g.fireWeaponSlot(s)
 		}
@@ -1364,7 +1365,7 @@ func (g *Game) drawEntity(dst *ebiten.Image, cam ebiten.GeoM, e *entity, camX, c
 	case kindWeapon:
 		col := colorPower
 		if cat := catForKey(e.power); cat >= 0 {
-			col = weaponCatalog[cat].col // the ring says which weapon lies there
+			col = weapon.Catalog[cat].Col // the ring says which weapon lies there
 		}
 		g.drawPulseRing(dst, cam, e, col)
 	}

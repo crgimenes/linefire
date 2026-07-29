@@ -3,6 +3,8 @@ package game
 import (
 	"math"
 	"testing"
+
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // TestArsenalStartsWithFrontGun: the ship launches with the front gun live in slot 1 and
@@ -22,7 +24,7 @@ func TestCollectArmsTheEmptySlotNotThePrimary(t *testing.T) {
 	g := &Game{}
 	g.initArsenal()
 
-	if !g.collectWeapon(catLaser) {
+	if !g.collectWeapon(weapon.CatLaser) {
 		t.Fatal("a new weapon should be collected")
 	}
 	if g.slotWeaponName(0) != "front" {
@@ -31,7 +33,7 @@ func TestCollectArmsTheEmptySlotNotThePrimary(t *testing.T) {
 	if g.slotWeaponName(1) != "laser" {
 		t.Fatalf("a new pickup should arm the empty secondary slot, got %q", g.slotWeaponName(1))
 	}
-	if g.collectWeapon(catLaser) {
+	if g.collectWeapon(weapon.CatLaser) {
 		t.Fatal("collecting a duplicate must report false")
 	}
 	if len(g.arsenal) != 2 {
@@ -46,7 +48,7 @@ func TestCollectArmsTheEmptySlotNotThePrimary(t *testing.T) {
 func TestCyclingSwapsNoseAndTurret(t *testing.T) {
 	g := &Game{}
 	g.initArsenal()
-	g.collectWeapon(catLaser) // gun on the nose, laser on the turret
+	g.collectWeapon(weapon.CatLaser) // gun on the nose, laser on the turret
 	if g.slotWeaponName(0) != "front" || g.slotWeaponName(1) != "laser" {
 		t.Fatalf("setup: want front/laser, got %q/%q", g.slotWeaponName(0), g.slotWeaponName(1))
 	}
@@ -66,8 +68,8 @@ func TestCyclingSwapsNoseAndTurret(t *testing.T) {
 func TestCyclingNeverDupsAndReachesEvery(t *testing.T) {
 	g := &Game{}
 	g.initArsenal()
-	g.collectWeapon(catMissile) // turret
-	g.collectWeapon(catLaser)   // arsenal: front, missile, laser
+	g.collectWeapon(weapon.CatMissile) // turret
+	g.collectWeapon(weapon.CatLaser)   // arsenal: front, missile, laser
 	seen := map[string]bool{}
 	for range 12 {
 		before := g.slotWeaponName(0)
@@ -91,16 +93,16 @@ func TestCyclingNeverDupsAndReachesEvery(t *testing.T) {
 // SLOT sets the direction, not the weapon. Slot 1 always fires forward, slot 2 toward the
 // cursor — so a laser in slot 1 is a forward beam, whatever its own aim field says.
 func TestSlotDecidesAimNotWeapon(t *testing.T) {
-	if slotAim(0) != aimForward {
+	if slotAim(0) != weapon.AimForward {
 		t.Fatal("slot 1 (primary) must fire forward")
 	}
-	if slotAim(1) != aimMouse {
+	if slotAim(1) != weapon.AimCursor {
 		t.Fatal("slot 2 (secondary) must fire toward the cursor")
 	}
-	// A MISSILE (its own aim is aimMouse) fired from slot 1 must ignore the cursor and shoot
+	// A MISSILE (its own aim is weapon.AimCursor) fired from slot 1 must ignore the cursor and shoot
 	// FORWARD, because the slot overrides the weapon's aim. With the ship pointing up, a
 	// forward shot travels straight up (vx≈0, vy<0); a cursor-aimed shot would slant.
-	g := &Game{arsenal: []int{catMissile}, slotArsIdx: [numSlots]int{0, -1}}
+	g := &Game{arsenal: []int{weapon.CatMissile}, slotArsIdx: [numSlots]int{0, -1}}
 	g.syncSlots()
 	g.x, g.y, g.angle = 100, 100, -90 // pointing up
 	g.fireWeaponSlot(0)
@@ -116,7 +118,7 @@ func TestSlotDecidesAimNotWeapon(t *testing.T) {
 // TestComputerAssistsOnlySecondary is the fix for "the primary laser auto-fires with the
 // secondary": the computer drives slot 2 only. The forward primary stays manual.
 func TestComputerAssistsOnlySecondary(t *testing.T) {
-	g := &Game{arsenal: []int{catLaser, catMissile}, slotArsIdx: [numSlots]int{0, 1}}
+	g := &Game{arsenal: []int{weapon.CatLaser, weapon.CatMissile}, slotArsIdx: [numSlots]int{0, 1}}
 	g.syncSlots()
 	g.autoFire, g.autoAimOK = true, true
 	g.autoAimX, g.autoAimY = 0, -1
@@ -135,7 +137,7 @@ func TestComputerAssistsOnlySecondary(t *testing.T) {
 // TestComputerNeverAutoDeploysMines: a mine in the secondary slot stays manual (no
 // auto-mining), matching the old computer behavior.
 func TestComputerNeverAutoDeploysMines(t *testing.T) {
-	g := &Game{arsenal: []int{catFront, catMine}, slotArsIdx: [numSlots]int{0, 1}}
+	g := &Game{arsenal: []int{weapon.CatFront, weapon.CatMine}, slotArsIdx: [numSlots]int{0, 1}}
 	g.syncSlots()
 	g.autoFire, g.autoAimOK = true, true
 	g.autoAimX, g.autoAimY = 0, -1

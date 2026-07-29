@@ -1,11 +1,15 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crgimenes/linefire/weapon"
+)
 
 // TestDevourerNeedsChargeAndIsUnique: deploy is refused with no charge, spends one when it fires,
 // and refuses a second while one is already live (one black hole at a time).
 func TestDevourerNeedsChargeAndIsUnique(t *testing.T) {
-	g := armSlot0(catDevourer)
+	g := armSlot0(weapon.CatDevourer)
 
 	g.fireWeaponSlot(0)
 	if g.devourer != nil {
@@ -32,7 +36,7 @@ func TestDevourerNeedsChargeAndIsUnique(t *testing.T) {
 // button press, so a HELD button neither spams "no charge" nor auto-burns a charge; ordinary
 // weapons still fire while held.
 func TestDevourerDeployNeedsFreshPress(t *testing.T) {
-	g := armSlot0(catDevourer)
+	g := armSlot0(weapon.CatDevourer)
 	g.devourerAmmo = 3
 
 	g.fireSlotInput(0, false) // button held, not a fresh press
@@ -45,7 +49,7 @@ func TestDevourerDeployNeedsFreshPress(t *testing.T) {
 	}
 
 	// A continuous weapon still fires while held (justPressed=false).
-	gc := armSlot0(catFront)
+	gc := armSlot0(weapon.CatFront)
 	gc.fireSlotInput(0, false)
 	if len(gc.projectiles) != 1 {
 		t.Fatalf("a held button should keep firing an ordinary weapon, got %d shots", len(gc.projectiles))
@@ -57,7 +61,7 @@ func TestDevourerDeployNeedsFreshPress(t *testing.T) {
 func TestIdkfaStocksDevourerCharges(t *testing.T) {
 	g := &Game{}
 	g.grantFullArsenal()
-	if !g.hasWeapon(catDevourer) {
+	if !g.hasWeapon(weapon.CatDevourer) {
 		t.Fatal("idkfa should grant the devourer")
 	}
 	if g.devourerAmmo <= 0 {

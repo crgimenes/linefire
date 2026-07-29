@@ -1,6 +1,10 @@
 package game
 
-import "math"
+import (
+	"math"
+
+	"github.com/crgimenes/linefire/weapon"
+)
 
 // The combat computer (auto-fire) fires whichever equipped weapons are mouse-aimed
 // (turret/missile/laser) at the nearest visible enemy, on their own cooldowns. A
@@ -51,8 +55,8 @@ func (g *Game) runAutoFire() {
 	// computer can point it at the target. The forward primary stays under manual control,
 	// and a mine is never auto-deployed.
 	const secondary = 1
-	k := g.slots[secondary].w.kind
-	if g.slots[secondary].filled && k != wkMine && k != wkDevourer {
+	k := g.slots[secondary].w.Kind
+	if g.slots[secondary].filled && k != weapon.KindMine && k != weapon.KindDevourer {
 		g.fireWeaponSlot(secondary)
 	}
 }

@@ -3,24 +3,19 @@ package game
 import (
 	"image/color"
 
+	"github.com/crgimenes/linefire/weapon"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const (
-	maxMines          = 5    // live mines cap (deploy is refused when full)
-	mineArmFrames     = 45   // delay before a freshly laid mine arms (blinks meanwhile)
-	mineTriggerRadius = 36.0 // an enemy within this of an armed mine sets it off
-	mineDamage        = 5    // blast center damage
-	mineRadius        = 64.0 // area-of-effect radius, world units
-	mineBlinkPeriod   = 8    // frames per blink phase while arming
-	mineCoreRadius    = 4.0  // drawn body radius, world units
+	mineBlinkPeriod = 8   // frames per blink phase while arming
+	mineCoreRadius  = 4.0 // drawn body radius, world units
 )
 
 var (
 	mineColor       = color.RGBA{0xff, 0x70, 0x30, 0xff} // armed body: hot orange
 	mineArmingColor = color.RGBA{0xff, 0xd0, 0x40, 0xff} // arming blink: yellow
-	mineDamageColor = color.RGBA{0xff, 0x80, 0x30, 0xff} // AoE damage numbers
 )
 
 // mine is a stationary trap: it arms after a delay, then detonates with an AoE
@@ -91,7 +86,7 @@ func (g *Game) drawMines(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 		if !glow {
 			ring := mineColor
 			ring.A = 0x50
-			vector.StrokeCircle(dst, cx, cy, float32(mineTriggerRadius*scale), float32(1*g.dpr), ring, true)
+			vector.StrokeCircle(dst, cx, cy, float32(weapon.Catalog[weapon.CatMine].TriggerRadius*scale), float32(1*g.dpr), ring, true)
 		}
 		if glow {
 			r *= 1.6 // a fatter, softer core feeds the bloom

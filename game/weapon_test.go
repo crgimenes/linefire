@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/crgimenes/linefire/asset"
+	"github.com/crgimenes/linefire/weapon"
 )
 
 // armSlot0 builds a game with one weapon collected and live in slot 0 (nil player:
@@ -17,19 +18,19 @@ func armSlot0(cat int) *Game {
 func TestCatalogHasEveryWeapon(t *testing.T) {
 	// The turret is not a weapon — it is the slot-2 mount — so the catalog is gun,
 	// missile, mine, laser, devourer.
-	if len(weaponCatalog) != 5 || weaponCatalog[catLaser].kind != wkLaser {
-		t.Fatalf("the catalog should hold all 5 weapon types incl. the devourer, got %d", len(weaponCatalog))
+	if len(weapon.Catalog) != 5 || weapon.Catalog[weapon.CatLaser].Kind != weapon.KindLaser {
+		t.Fatalf("the catalog should hold all 5 weapon types incl. the devourer, got %d", len(weapon.Catalog))
 	}
-	if weaponCatalog[catFront].aim != aimForward || weaponCatalog[catMine].kind != wkMine {
-		t.Fatalf("catalog entries out of order: %+v", weaponCatalog)
+	if weapon.Catalog[weapon.CatFront].Aim != weapon.AimForward || weapon.Catalog[weapon.CatMine].Kind != weapon.KindMine {
+		t.Fatalf("catalog entries out of order: %+v", weapon.Catalog)
 	}
-	if weaponCatalog[catDevourer].kind != wkDevourer {
-		t.Fatalf("the devourer should be the black-hole weapon, got %+v", weaponCatalog[catDevourer])
+	if weapon.Catalog[weapon.CatDevourer].Kind != weapon.KindDevourer {
+		t.Fatalf("the devourer should be the black-hole weapon, got %+v", weapon.Catalog[weapon.CatDevourer])
 	}
 }
 
 func TestFireSlotRespectsCooldown(t *testing.T) {
-	g := armSlot0(catFront)
+	g := armSlot0(weapon.CatFront)
 
 	g.fireWeaponSlot(0)
 	if len(g.projectiles) != 1 {
@@ -44,7 +45,7 @@ func TestFireSlotRespectsCooldown(t *testing.T) {
 		t.Fatalf("a use on cooldown must not fire, got %d shots", len(g.projectiles))
 	}
 
-	for range weaponFrontGun.cooldown {
+	for range weapon.Catalog[weapon.CatFront].Cooldown {
 		g.tickWeapons()
 	}
 	g.fireWeaponSlot(0)
@@ -54,7 +55,7 @@ func TestFireSlotRespectsCooldown(t *testing.T) {
 }
 
 func TestEmptySlotDoesNotFire(t *testing.T) {
-	g := &Game{arsenal: []int{catFront}, slotArsIdx: [numSlots]int{-1, -1}}
+	g := &Game{arsenal: []int{weapon.CatFront}, slotArsIdx: [numSlots]int{-1, -1}}
 	g.syncSlots()
 	g.fireWeaponSlot(0)
 	if len(g.projectiles) != 0 {
@@ -68,13 +69,13 @@ func TestEmptySlotDoesNotFire(t *testing.T) {
 }
 
 func TestMineSlotCarriesWeaponPayload(t *testing.T) {
-	g := armSlot0(catMine)
+	g := armSlot0(weapon.CatMine)
 	g.fireWeaponSlot(0)
 	if len(g.mines) != 1 {
 		t.Fatalf("the mine slot should deploy a mine, got %d", len(g.mines))
 	}
 	m := g.mines[0]
-	if m.dmg != mineDamage || m.radius != mineRadius || m.trigger != mineTriggerRadius {
+	if m.dmg != weapon.Catalog[weapon.CatMine].Damage || m.radius != weapon.Catalog[weapon.CatMine].AOE || m.trigger != weapon.Catalog[weapon.CatMine].TriggerRadius {
 		t.Fatalf("the deployed mine should carry the weapon's payload, got %+v", m)
 	}
 }
@@ -82,13 +83,13 @@ func TestMineSlotCarriesWeaponPayload(t *testing.T) {
 func TestUnusableWeaponDoesNotLockCooldown(t *testing.T) {
 	// The mine cooldown is 0, so the only limit is its cap. Deploying past the cap must
 	// fail (useWeapon returns false) without locking the slot, so exactly the cap deploy.
-	g := armSlot0(catMine)
-	for range maxMines + 3 {
+	g := armSlot0(weapon.CatMine)
+	for range weapon.Catalog[weapon.CatMine].MaxLive + 3 {
 		g.slots[0].cd = 0 // clear the spacing cooldown so only the cap limits it
 		g.fireWeaponSlot(0)
 	}
-	if len(g.mines) != maxMines {
-		t.Fatalf("mine cap should hold at %d, got %d", maxMines, len(g.mines))
+	if len(g.mines) != weapon.Catalog[weapon.CatMine].MaxLive {
+		t.Fatalf("mine cap should hold at %d, got %d", weapon.Catalog[weapon.CatMine].MaxLive, len(g.mines))
 	}
 }
 

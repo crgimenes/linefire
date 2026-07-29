@@ -8,19 +8,11 @@ import (
 )
 
 const (
-	missileSpeed     = 7.0  // world units per frame (slower than bullets)
-	missileLife      = 110  // frames before it fizzles out
-	missileInterval  = 45   // frames between missiles (heavy weapon, long cooldown)
-	missileDamage    = 4    // full damage at the blast center
-	missileRadius    = 70.0 // area-of-effect radius, world units
-	missileWidth     = 2.4  // crisp core stroke, logical px (scaled by DPI)
-	missileGlowWidth = 5.0  // wider emissive stroke feeding the bloom
-	missileShake     = 9.0  // screen shake on detonation
+	missileShake = 9.0 // screen shake on detonation
 )
 
 var (
 	missileColor       = color.RGBA{0xff, 0xa0, 0x40, 0xff} // hot orange core
-	missileGlowColor   = color.RGBA{0xff, 0x60, 0x20, 0xff} // orange halo
 	missileDamageColor = color.RGBA{0xff, 0xa0, 0x40, 0xff} // orange AoE damage numbers
 )
 

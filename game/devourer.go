@@ -5,12 +5,13 @@ import (
 	"math"
 
 	"github.com/crgimenes/linefire/effects"
+	"github.com/crgimenes/linefire/weapon"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // The DEVOURER is the game's one-of-a-kind superweapon: a deployable black hole. You drop it
-// (aimDrop, like a mine), it ARMS for a couple of seconds — a growing vortex with a countdown,
+// (weapon.AimDrop, like a mine), it ARMS for a couple of seconds — a growing vortex with a countdown,
 // your window to flee — then it goes ACTIVE and drags EVERYTHING toward it, the player included:
 // to hold position you must thrust away at full burn. Anything that reaches the core is swallowed
 // and destroyed; debris streams in from all around for drama. When the timer runs out it COLLAPSES
@@ -20,9 +21,8 @@ import (
 const (
 	devourerCharges = 3 // uses granted per pickup
 
-	devourerArm      = 180 // frames arming before the pull starts (~3s: the flee window)
-	devourerActive   = 300 // frames the pull lasts (~5s)
-	devourerCooldown = 90  // frames between deploys (spam guard on top of charges + one-at-a-time)
+	devourerArm    = 180 // frames arming before the pull starts (~3s: the flee window)
+	devourerActive = 300 // frames the pull lasts (~5s)
 
 	devourerReach      = 1200.0 // world radius the pull reaches — the whole screen and beyond
 	devourerPullAccel  = 0.16   // player pull accel at the rim (< thrust so a full-burn flee can hold)
@@ -34,7 +34,6 @@ const (
 	devourerDangerDPS = 4     // base hull damage per tick in the danger zone (scales up toward the core)
 	devourerHurtEvery = 6     // frames between danger-zone hull ticks, so the hit SFX does not machine-gun
 
-	devourerCollapseDmg    = 300   // implosion center damage: massive — levels nearly everything in range
 	devourerCollapseRadius = 460.0 // implosion radius
 
 	devourerVisRadius = 60.0 // drawn vortex radius, world units
@@ -67,7 +66,7 @@ type devourer struct {
 
 // deployDevourerWeapon drops the black hole at the ship, spending a charge. Refused with no
 // charge or while one is already live, so a held button cannot stack them.
-func (g *Game) deployDevourerWeapon(w *weapon) bool {
+func (g *Game) deployDevourerWeapon(w *weapon.Weapon) bool {
 	if g.devourerAmmo <= 0 {
 		g.logf("DEVOURER  no charge")
 		return false
@@ -77,7 +76,7 @@ func (g *Game) deployDevourerWeapon(w *weapon) bool {
 	}
 	g.devourerAmmo--
 	g.devourer = &devourer{x: g.x, y: g.y, arm: devourerArm, active: devourerActive}
-	g.sfx.play(w.fire)
+	g.sfx.play(soundOf(w.Fire))
 	g.logf("DEPLOY  ► DEVOURER // %d left", g.devourerAmmo)
 	return true
 }
@@ -254,13 +253,13 @@ func (g *Game) spawnDevourerDebris(d *devourer) {
 // any escorts caught in it, and hits a too-close player — plus a shockwave, a violet flare and a
 // hard shake.
 func (g *Game) collapseDevourer(d *devourer) {
-	g.explodeAt(d.x, d.y, devourerCollapseDmg, devourerCollapseRadius, devourerColor)
+	g.explodeAt(d.x, d.y, weapon.Catalog[weapon.CatDevourer].Damage, devourerCollapseRadius, devourerColor)
 	g.digAt(d.x, d.y, devourerCollapseRadius) // level the structures in the blast (nil-safe on procedural maps)
 	g.destroyAlliesInRadius(d.x, d.y, devourerCollapseRadius)
 	g.emitBurst(d.x, d.y, devourerCollapseBurst)
 	g.addShake(deathShake * 1.8)
 	if dist := math.Hypot(g.x-d.x, g.y-d.y); dist < devourerCollapseRadius {
-		g.hurtPlayer(int(math.Ceil(float64(devourerCollapseDmg) * (1 - dist/devourerCollapseRadius))))
+		g.hurtPlayer(int(math.Ceil(float64(weapon.Catalog[weapon.CatDevourer].Damage) * (1 - dist/devourerCollapseRadius))))
 	}
 	g.logf("*** DEVOURER COLLAPSE ***")
 }
