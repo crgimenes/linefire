@@ -105,7 +105,8 @@ const creditsRegenFrames = 1200
 // restarting the credits scroll or dropping the title.
 func (g *Game) buildCreditsArena() {
 	scroll, konami, playable, title := g.creditsScroll, g.konamiN, g.creditsPlayable, g.titleMode
-	ret := g.screenReturn // the remembered back-out screen must survive the periodic regen
+	skirmish, transparent, debug := g.skirmishMode, g.transparent, g.debugHUD // the overlay flags survive the regen too
+	ret := g.screenReturn                                                     // the remembered back-out screen must survive the periodic regen
 
 	// A freshly generated cave (randIntN is auto-seeded, so it varies per launch too); the
 	// empty-target exit portal is inert while the demo runs, so it is just decoration. The arena
@@ -136,6 +137,10 @@ func (g *Game) buildCreditsArena() {
 	}
 	g.creditsMode = true
 	g.creditsScroll, g.konamiN, g.creditsPlayable, g.titleMode = scroll, konami, playable, title
+	g.skirmishMode, g.transparent, g.debugHUD = skirmish, transparent, debug
+	if transparent {
+		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry
+	}
 	g.screenReturn = ret
 	g.creditsRegenCD = creditsRegenFrames
 	g.attractRecords = g.buildAttractRecords() // refresh the records page (New wiped it); reflects the latest run

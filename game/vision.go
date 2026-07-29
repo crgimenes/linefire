@@ -380,6 +380,9 @@ func (g *Game) rehydrateFogTex() {
 // polygon (the vision cone, blocked by walls), in world space. Drawn before the
 // ship/HUD, so the ship — always inside its own vision — stays visible.
 func (g *Game) drawBrushFog(screen *ebiten.Image) {
+	if g.transparent {
+		return // fog is an opaque veil; over the desktop it would just black the screen out
+	}
 	if g.disc == nil {
 		return // simple (procedural) map: no fog of war
 	}

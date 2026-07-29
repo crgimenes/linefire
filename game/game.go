@@ -188,6 +188,8 @@ type Game struct {
 
 	titleMode       bool     // the front-door title screen is up (attract demo + "press space to start")
 	creditsMode     bool     // the credits attract screen is running (autonomous demo + scroll)
+	skirmishMode    bool     // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
+	transparent     bool     // the screen alpha is real (a transparent window): no background fill, no fog
 	creditsPlayable bool     // the Konami code handed control to the player
 	creditsScroll   float64  // credits vertical scroll offset (logical px)
 	konamiN         int      // progress through the Konami sequence
@@ -581,7 +583,10 @@ func (g *Game) Update() error {
 
 	// The credits attract screen: it owns Esc (exit) and the Konami code, then the
 	// autonomous sim runs below (the input branch flies it on autopilot).
-	if g.creditsMode {
+	switch {
+	case g.skirmishMode:
+		g.stepSkirmishMeta() // only the periodic regen: the overlay window has no player at the keys
+	case g.creditsMode:
 		if g.titleMode && inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			g.sfx.saveConfig()
 			return ebiten.Termination // Esc quits from the title screen
@@ -959,13 +964,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// The credits screen dims the running demo and scrolls its text over it, in
 	// place of the gameplay HUD.
-	if g.creditsMode {
+	if g.creditsMode && !g.skirmishMode {
 		g.drawCredits(screen)
 		g.prevX, g.prevY, g.prevAngle = g.x, g.y, g.angle
 		return
 	}
 
-	if !g.paused && !g.over && !g.mapOpen {
+	// The crosshair follows the mouse, and in skirmish the mouse belongs to
+	// whatever the user is actually doing under the overlay.
+	if !g.paused && !g.over && !g.mapOpen && !g.skirmishMode {
 		g.drawCrosshair(screen)
 	}
 
@@ -1046,6 +1053,19 @@ func (g *Game) accumulateWorld(dst *ebiten.Image) {
 // navigable region is carved crisply to black); classic mode draws line walls.
 func (g *Game) drawWorld(dst *ebiten.Image, region image.Rectangle, camX, camY, camAngle float64, showPlayer bool) {
 	cam := g.cameraGeoMAt(camX, camY, camAngle)
+
+	if g.transparent {
+		// The desktop is the floor: clear to alpha and draw only lines and light.
+		dst.Clear()
+		g.bloomGlow(dst, region, func(emissive *ebiten.Image) {
+			g.wallGlow.Draw(emissive, cam, true)
+			g.drawEntityGlow(emissive, cam, camX, camY, camAngle, showPlayer)
+		})
+		g.wallMesh.Draw(dst, cam, true)
+		g.drawGoalZones(dst, cam)
+		g.drawEntityLayer(dst, cam, camX, camY, camAngle)
+		return
+	}
 
 	if g.floodView {
 		dst.Fill(floodFillColor) // intermediate base so the exterior never reaches black
