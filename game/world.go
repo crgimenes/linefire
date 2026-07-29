@@ -590,6 +590,9 @@ func (g *Game) enemyFire(e *entity) {
 		vy:   dy / d * speed,
 		life: enemyBulletLife,
 		dmg:  e.shotDmg,
+		// The same render payload every other shot carries, so an enemy bolt is
+		// the player's effect in another color rather than its own thing.
+		rcol: enemyShotColor, rglow: enemyShotGlowColor, width: bulletWidth, glowW: bulletGlowWidth,
 	})
 	// The enemy's own fire sound, when its asset declares one ("fire" has no
 	// fallback on purpose: a full room of default pew-pew would swamp the mix).

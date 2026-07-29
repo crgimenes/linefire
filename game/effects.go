@@ -46,7 +46,7 @@ var (
 	debrisColor      = color.RGBA{0xff, 0x90, 0x40, 0xff} // hotter ember chunks
 	pickupColor      = color.RGBA{0x80, 0xff, 0xb0, 0xff} // green pickup burst
 	muzzleColor      = color.RGBA{0xe8, 0xff, 0xff, 0xff} // bright muzzle flash
-	wallSparkColor   = color.RGBA{0xc0, 0xff, 0xff, 0xff} // cyan-white bullet-on-wall sparks
+	wallSparkColor   = color.RGBA{0xc0, 0xff, 0xff, 0xff} // wallSparks default, for a caller with no shot color to pass
 	shieldSparkColor = color.RGBA{0x80, 0xff, 0xff, 0xff} // cyan shield deflection
 	thrusterColor    = color.RGBA{0x90, 0xe0, 0xff, 0xff} // pale blue engine exhaust
 )

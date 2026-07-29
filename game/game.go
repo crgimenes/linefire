@@ -1168,8 +1168,8 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 	}
 	g.drawAllyGlow(emissive, camX, camY, camAngle)
 	g.drawLaser(emissive, cam, true)
-	g.drawShots(emissive, cam, true)
-	g.drawEnemyShots(emissive, cam, true)
+	g.drawBolts(emissive, cam, g.projectiles, true)
+	g.drawBolts(emissive, cam, g.enemyShots, true)
 	g.drawMines(emissive, cam, true)
 	g.drawParticles(emissive, cam, true)
 	g.drawMuzzleFlash(emissive, cam, muzzleColor, 9)
@@ -1185,8 +1185,8 @@ func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, c
 	}
 	g.drawAllies(dst, camX, camY, camAngle) // friendly companions, over the world
 	g.drawLaser(dst, cam, false)
-	g.drawShots(dst, cam, false)
-	g.drawEnemyShots(dst, cam, false)
+	g.drawBolts(dst, cam, g.projectiles, false)
+	g.drawBolts(dst, cam, g.enemyShots, false)
 	g.drawMines(dst, cam, false)
 	g.drawDevourer(dst, cam)
 	g.drawParticles(dst, cam, false)

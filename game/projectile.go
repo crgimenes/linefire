@@ -16,14 +16,19 @@ const (
 	playerShotDamage = 1   // hull damage one gun bullet deals
 
 	bulletWidth     = 1.6 // crisp core stroke, logical px (scaled by DPI)
-	bulletGlowWidth = 3.2 // wider emissive stroke feeding the bloom
+	bulletGlowWidth = 2.0 // emissive stroke feeding the bloom
 	bulletHitRadius = 2.0 // world units; bullet-vs-wall collision tolerance
 
 	// The bolt's own halo, added under the core in the crisp pass (the bloom still
 	// lays the soft outer glow on top). Bolts used to be a flat painted line that
 	// the rock swallowed; adding light instead — kutta's smoke trick — makes them
 	// read against any background without turning up the bloom for the whole scene.
-	boltHaloWidth  = 3.2 // halo stroke as a multiple of the core width
+	//
+	// The halo and the emissive stroke are both kept close to the core width: at
+	// 3.2x the core the bolt read as a thick bar of light, out of key with the thin
+	// vector art around it. The wake stays — a shot is still light fading out
+	// behind itself — it is just narrow now.
+	boltHaloWidth  = 2.0 // halo stroke as a multiple of the core width
 	boltHaloGain   = 0.3 // how much of the halo color each bolt adds
 	boltTrailSteps = 4   // wake segments dragged behind the bolt, each thinner and dimmer
 	boltTrailSpan  = 1.6 // travel each wake segment spans, in frames (a frame's step is tiny)
@@ -192,9 +197,6 @@ func (g *Game) stepPlayerShots(shots []projectile) []projectile {
 // miss just sparks.
 func (g *Game) impactBurst(x, y float64, p *projectile, hitEnemy bool) {
 	col := p.rglow
-	if col.A == 0 {
-		col = wallSparkColor // enemy shots / bare projectiles have no per-weapon glow
-	}
 	n := min(impactSparksBase+p.dmg*impactSparksPerDmg, impactMaxSparks)
 	g.emitBurst(x, y, burstSpec{
 		n: n, col: col, style: styleStreak,
@@ -224,7 +226,14 @@ func (g *Game) stepEnemyShots() {
 		rx, ry, hitRock := g.bulletRockHit(p.px, p.py, nx, ny)
 		if hitRock {
 			g.dig(rx, ry, p.dmg) // SPIKE: enemy fire chews the rock too
-			g.emitBurst(rx, ry, wallSparks)
+			// The player's wall sparks (impactBurst) in the shot's own color. The
+			// spark COUNT is not shared: impactBurst scales it by damage, and enemy
+			// damage is in player-health units (16-32) while player damage is in
+			// enemy-hull units (1), so the same formula would read as a much bigger
+			// burst for the same event.
+			sparks := wallSparks
+			sparks.col = p.rglow
+			g.emitBurst(rx, ry, sparks)
 			continue
 		}
 		if g.invuln <= 0 && distPointSegmentSq(g.x, g.y, p.px, p.py, nx, ny) <= g.radius*g.radius {
@@ -339,29 +348,17 @@ func (g *Game) drawBolt(dst *ebiten.Image, x0, y0, x1, y1, width float64, core, 
 	strokeLineAdd(dst, x0, y0, x1, y1, width*g.dpr, core, 1)
 }
 
-// drawEnemyShots draws the enemy bullet pool as streaks from each shot's previous
-// to its current position. glow selects the wider, softer stroke that feeds the
-// bloom instead of the bolt itself.
-func (g *Game) drawEnemyShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
-	for i := range g.enemyShots {
-		p := &g.enemyShots[i]
-		x0, y0 := cam.Apply(p.px, p.py)
-		x1, y1 := cam.Apply(p.x, p.y)
-		if glow {
-			g.boltTrail(dst, x0, y0, x1, y1, bulletGlowWidth, enemyShotGlowColor, 1)
-			strokeLine(dst, x0, y0, x1, y1, bulletGlowWidth*g.dpr, enemyShotGlowColor)
-			continue
-		}
-		g.drawBolt(dst, x0, y0, x1, y1, bulletWidth, enemyShotColor, enemyShotGlowColor)
-	}
-}
-
-// drawShots draws the player projectile pool, each bullet in its own weapon's
-// color and width (so one pool can carry shots from every equipped weapon). glow
-// selects the wider, softer stroke that feeds the bloom instead of the bolt itself.
-func (g *Game) drawShots(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
-	for i := range g.projectiles {
-		p := &g.projectiles[i]
+// drawBolts draws a projectile pool as streaks from each shot's previous to its
+// current position, each bullet in its own color and width (so one pool can carry
+// shots from every equipped weapon). glow selects the wider, softer stroke that
+// feeds the bloom instead of the bolt itself.
+//
+// Both pools draw through here: an enemy shot used to take a separate path with
+// the colors hardcoded, which is how it drifted into being a different effect
+// rather than the same one in another color.
+func (g *Game) drawBolts(dst *ebiten.Image, cam ebiten.GeoM, shots []projectile, glow bool) {
+	for i := range shots {
+		p := &shots[i]
 		x0, y0 := cam.Apply(p.px, p.py)
 		x1, y1 := cam.Apply(p.x, p.y)
 		if glow {
