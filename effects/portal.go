@@ -35,6 +35,12 @@ type Portal struct {
 	// it down as the vortex closes.
 	Fade float64
 
+	// HideRing drops the rim the motes are born on, leaving only the convergence.
+	// A portal that stands in the world wants the ring — it is a place you can fly
+	// into. One that exists for a moment to deliver a ship does not: without the
+	// rim the motes read as something materialising rather than a hole opening.
+	HideRing bool
+
 	DPR   float64 // device pixels per logical px, for the ring stroke
 	Scale float64 // screen pixels per world unit, for the mote size
 }
@@ -56,10 +62,11 @@ func DrawPortal(dst *ebiten.Image, p Portal) {
 		return
 	}
 
-	cx, cy := float32(p.X), float32(p.Y)
-	ring := p.Col
-	ring.A = scaleAlpha(portalRingBase+0x80*(0.5+0.5*math.Sin(p.Seconds*portalRingPulse)), fade)
-	vector.StrokeCircle(dst, cx, cy, float32(p.Radius), float32(portalRingWidth*p.DPR), ring, true)
+	if !p.HideRing {
+		ring := p.Col
+		ring.A = scaleAlpha(portalRingBase+0x80*(0.5+0.5*math.Sin(p.Seconds*portalRingPulse)), fade)
+		vector.StrokeCircle(dst, float32(p.X), float32(p.Y), float32(p.Radius), float32(portalRingWidth*p.DPR), ring, true)
+	}
 
 	for i := range portalMotes {
 		phase := p.Seconds*portalSpeed + float64(i)/portalMotes
