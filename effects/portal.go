@@ -118,3 +118,28 @@ func SpokeAngle(i, c int) float64 {
 func scaleAlpha(a, fade float64) uint8 {
 	return uint8(max(min(a*fade, 255), 0))
 }
+
+// pulseRing is the ring's own rhythm and thickness, shared by everything that
+// uses one to draw the eye.
+const (
+	pulseCycles = 4.0  // brightness cycles per second
+	pulseGrow   = 8.0  // how far the ring swells, world units
+	pulseInset  = 4.0  // clearance between the marked thing and the ring at its tightest
+	pulseWidth  = 1.5  // stroke, logical px
+	pulseAlpha  = 0x40 // alpha floor
+)
+
+// DrawPulseRing draws a breathing ring around something worth looking at — a
+// power-up on the ground, a portal standing in the world. radius is what it
+// encircles, in screen pixels; scale converts the swell and the inset from world
+// units, and dpr the stroke.
+//
+// It is here rather than in either game because it is the mark Linefire uses to
+// say "this is worth flying to", and that has to look the same wherever it says
+// it.
+func DrawPulseRing(dst *ebiten.Image, x, y, radius float64, col color.RGBA, seconds, scale, dpr float64) {
+	pulse := 0.5 + 0.5*math.Sin(seconds*pulseCycles)
+	r := radius + (pulseInset+pulse*pulseGrow)*scale
+	col.A = uint8(min(pulseAlpha+0x80*pulse, 255))
+	vector.StrokeCircle(dst, float32(x), float32(y), float32(r), float32(pulseWidth*dpr), col, true)
+}

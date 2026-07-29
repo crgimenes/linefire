@@ -1391,15 +1391,13 @@ func (g *Game) drawPortal(dst *ebiten.Image, cam ebiten.GeoM, e *entity) {
 	})
 }
 
-// drawPulseRing draws a pulsing ring around an entity so it draws the eye, in the
-// given accent color. Used for power-ups and portals.
+// drawPulseRing draws the shared pulsing ring around an entity, in the given
+// accent colour. Used for power-ups and portals.
 func (g *Game) drawPulseRing(dst *ebiten.Image, cam ebiten.GeoM, e *entity, col color.RGBA) {
-	t := float64(ebiten.Tick()) / float64(ebiten.TPS())
-	pulse := 0.5 + 0.5*math.Sin(t*4)
 	mx, my := cam.Apply(e.x, e.y)
-	r := (e.radius + 4 + pulse*8) * g.camPixelScale()
-	col.A = uint8(0x40 + 0x80*pulse)
-	vector.StrokeCircle(dst, float32(mx), float32(my), float32(r), float32(1.5*g.dpr), col, true)
+	sc := g.camPixelScale()
+	effects.DrawPulseRing(dst, mx, my, e.radius*sc, col,
+		float64(ebiten.Tick())/float64(ebiten.TPS()), sc, g.dpr)
 }
 
 // powerupColor is the accent color for a power-up effect.
