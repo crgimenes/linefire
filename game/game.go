@@ -1249,6 +1249,13 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 // drawEntityLayer draws the crisp foreground: enemies, bullets and effects.
 func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, camAngle float64, showPlayer bool) {
 	g.drawArrivals(dst, cam) // under everything: a ship comes OUT of its vortex
+	// Emitted matter goes UNDER the hulls: exhaust and the muzzle flash pour out
+	// at the emitting ship's own outline, and drawn on top they overpaint it —
+	// under, the silhouette clips them and the plume reads as coming from behind
+	// the ship. Bolts, beams and shockwaves stay above: those cross OTHER ships,
+	// and a shot ducking under its target reads as a miss.
+	g.drawParticles(dst, cam, false)
+	g.drawMuzzleFlash(dst, cam, muzzleColor, 5)
 	for i := range g.entities {
 		if g.fogHidden(g.entities[i].x, g.entities[i].y) {
 			continue // hidden in the fog: only visible where the brush has cleared
@@ -1264,9 +1271,7 @@ func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, c
 	g.drawBolts(dst, cam, g.enemyShots, false)
 	g.drawMines(dst, cam, false)
 	g.drawDevourer(dst, cam)
-	g.drawParticles(dst, cam, false)
 	g.drawShockwaves(dst, cam)
-	g.drawMuzzleFlash(dst, cam, muzzleColor, 5)
 	g.drawFloaters(dst, cam)
 }
 
