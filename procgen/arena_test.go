@@ -6,9 +6,8 @@ import (
 	"github.com/crgimenes/linefire/asset"
 )
 
-// The point of an arena is that its wall layer is a handful of segments, not
-// thousands: it is for a caller that has to STROKE its walls, where a cave is
-// affordable only because it is drawn as negative space.
+// An arena's wall layer is a handful of segments, not thousands: it exists for
+// collision, and collision walks every path whether or not it is drawn.
 func TestArenaHasFewWalls(t *testing.T) {
 	lvl := GenArena(1, 0, 0)
 	if len(lvl.Walls) != 1 {
@@ -48,6 +47,16 @@ func TestArenaIsClosedAroundItsStart(t *testing.T) {
 		if c.X < 0 || c.X > lvl.Size.W || c.Y < 0 || c.Y > lvl.Size.H {
 			t.Errorf("perimeter point %.0f,%.0f is outside the declared size", c.X, c.Y)
 		}
+	}
+}
+
+// The perimeter is physics, not decoration: no stroke and no glow, so the mesh
+// builders produce nothing for it and the screen edge is the visible border.
+func TestArenaPerimeterIsInvisible(t *testing.T) {
+	wall := GenArena(1, 0, 0).Walls[0]
+	if wall.StrokeWidth != 0 || wall.Glow != 0 {
+		t.Errorf("the perimeter declares stroke width %v and glow %v; an open field has no fence",
+			wall.StrokeWidth, wall.Glow)
 	}
 }
 

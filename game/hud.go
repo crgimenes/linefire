@@ -78,6 +78,15 @@ func (g *Game) modsLine() string {
 // then scales it to the device resolution, so the text and bars are the same
 // physical size on every monitor.
 func (g *Game) drawHUDContent(dst *ebiten.Image) {
+	// A faction battle has no "the player": bars, pips, score, log and slots all
+	// describe a single ship at a keyboard, which skirmish does not have. The
+	// developer overlay is the one readout a spectator's debug run still wants.
+	if g.skirmishMode {
+		if g.debugHUD {
+			g.drawDebug(dst)
+		}
+		return
+	}
 	const (
 		pad     = 12.0
 		barW    = 220.0

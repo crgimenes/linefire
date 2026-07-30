@@ -35,6 +35,14 @@ import (
 //   - no screen shake: the camera is the arena, and jolting the whole field
 //     because one ship of sixteen took a hit reads as a fault, not as impact;
 //   - no crosshair: the mouse belongs to whatever the user is actually doing;
+//   - no player HUD: bars, pips, score and log describe a single ship at a
+//     keyboard; only the developer overlay remains, behind Debug;
+//   - no keys: skirmish reads no input at all — ships answer to their programs,
+//     the program answers to its floating panel, and every keystroke belongs to
+//     the desktop underneath (see Update);
+//   - no arena border: the open field's perimeter is collision only (GenArena
+//     declares no stroke), so the screen edge — or the window frame — is the
+//     visible border;
 //   - silent unless asked: a desktop toy does not talk first.
 //
 // The arrival effect: linefire's tunnel-to-the-next-stage vortex, retuned so it
@@ -72,7 +80,7 @@ type arrival struct {
 
 type SkirmishOptions struct {
 	Sound bool // create the audio context (default silent)
-	Debug bool // start with the F3 debug HUD up
+	Debug bool // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
 }
 
 // NewSkirmish builds the attract demo for a transparent desktop window: the

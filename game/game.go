@@ -609,13 +609,20 @@ func (g *Game) updateHotkeys() {
 }
 
 func (g *Game) Update() error {
-	g.updateCursor()
 	g.sfx.update()    // tick sound throttles + prune finished players (nil-safe)
 	g.laserOn = false // re-asserted each frame the beam is actually held
 
 	g.stepForcedGC() // web only: run finalizers so dead map/arena textures actually free
 	g.updateTouch()  // track thumbs first, so every branch below sees fresh touch state
-	g.updateHotkeys()
+
+	// Skirmish reads no input at all: every key — and the system cursor itself —
+	// belongs to whatever the user is doing under the overlay. Ships answer to
+	// their programs, the program answers to its floating panel, never to the
+	// keyboard. (Esc is gated below for the same reason.)
+	if !g.skirmishMode {
+		g.updateCursor()
+		g.updateHotkeys()
+	}
 
 	// The credits attract screen: it owns Esc (exit) and the Konami code, then the
 	// autonomous sim runs below (the input branch flies it on autopilot).
@@ -637,7 +644,7 @@ func (g *Game) Update() error {
 		g.sfx.stopLoops() // the engine/beam must not hum through the menu
 		return g.updatePauseMenu()
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) && !g.skirmishMode {
 		g.paused = true
 		return nil
 	}
