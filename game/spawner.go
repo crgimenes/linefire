@@ -113,6 +113,13 @@ func (g *Game) stepHorde() {
 func (g *Game) spawnHordeEnemy() bool {
 	h := g.horde
 	kind := h.types[h.rng.IntN(len(h.types))]
+	if g.arenaCam {
+		// An arena has no "around the player": ships materialise anywhere on the
+		// field, and the vortex is what makes that read as arriving rather than as
+		// popping into existence.
+		g.spawnArrival(kind, h.rng)
+		return true
+	}
 	maxDist := g.hordeSpawnDist()
 	for range hordeSpawnTries {
 		ang := h.rng.Float64() * 2 * math.Pi

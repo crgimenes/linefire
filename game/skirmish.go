@@ -1,8 +1,14 @@
 package game
 
 import (
+	"image/color"
 	"io/fs"
 	"math"
+	"math/rand/v2"
+
+	"github.com/hajimehoshi/ebiten/v2"
+
+	"github.com/crgimenes/linefire/effects"
 
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/weapon"
@@ -22,8 +28,48 @@ import (
 //     which an alpha screen cannot carry;
 //   - a fixed arena camera: several ships a side are fighting, so the view cannot
 //     ride one of them (see camPose), and the arena is sized to fill it;
+//   - ships materialise anywhere on the field instead of walking in from a ring
+//     around the player, which is a notion an arena does not have;
+//   - no minimap: it maps a cave you cannot see all of, and here you can see all
+//     of the arena — it is the whole screen;
+//   - no screen shake: the camera is the arena, and jolting the whole field
+//     because one ship of sixteen took a hit reads as a fault, not as impact;
 //   - no crosshair: the mouse belongs to whatever the user is actually doing;
 //   - silent unless asked: a desktop toy does not talk first.
+//
+// The arrival effect: linefire's tunnel-to-the-next-stage vortex, retuned so it
+// reads as a ship materialising rather than as a hole opening.
+//
+// The vortex lives exactly as long as the wait for the ship, so it finishes and
+// vanishes on the frame the hull appears — the motes fall in, the portal goes, and
+// the ship is there. Anything that overlapped would read as a ship sliding out of
+// a hole that is still open.
+const (
+	materialiseTicks = 30  // how long the vortex runs before the ship exists (0.5s)
+	arrivalRadius    = 48  // rim, world units: linefire's portal circle, opened out
+	arrivalMoteSpeed = 6.0 // several full rim-to-centre trips inside that half second
+	arrivalMoteScale = 2.0 / 3
+	arrivalOpenSpeed = 4.0 // how much of its life it spends widening
+
+	// Arrivals are placed at random — an arena has no "around the player" to spawn
+	// on — but drawn from a few candidates, keeping the one furthest from anything
+	// already flying. Pure random put ships on top of each other often enough to
+	// look broken; this costs a handful of draws.
+	arrivalCandidates = 8
+	arrivalInset      = 80 // world units kept clear of the walls, so nothing lands in one
+)
+
+// arrivalColor is the vortex tint: the cool cyan the game marks navigation with.
+var arrivalColor = color.RGBA{0x80, 0xff, 0xff, 0xff}
+
+// arrival is a ship on its way in: what it will be, where it will appear, and how
+// long the vortex has left to run.
+type arrival struct {
+	kind string
+	x, y float64
+	left int
+}
+
 type SkirmishOptions struct {
 	Sound bool // create the audio context (default silent)
 	Debug bool // start with the F3 debug HUD up
@@ -98,5 +144,83 @@ func (g *Game) stepSkirmishMeta() {
 	g.creditsRegenCD--
 	if g.creditsRegenCD <= 0 || !g.arenaFitsView() {
 		g.buildCreditsArena() // a fresh field to keep flying and fighting in
+	}
+}
+
+// spawnArrival opens a vortex somewhere on the field for a ship of the given
+// kind. The point is random — an arena has no "around the player" to spawn on —
+// but chosen as the clearest of a few draws, so arrivals do not land on top of
+// whatever is already fighting.
+func (g *Game) spawnArrival(kind string, rng *rand.Rand) {
+	minX, minY := g.bounds.minX+arrivalInset, g.bounds.minY+arrivalInset
+	spanX := max(g.bounds.maxX-arrivalInset-minX, 1)
+	spanY := max(g.bounds.maxY-arrivalInset-minY, 1)
+
+	bestX, bestY, bestClear := minX, minY, -1.0
+	for range arrivalCandidates {
+		x, y := minX+rng.Float64()*spanX, minY+rng.Float64()*spanY
+		clear := g.clearanceAt(x, y)
+		if clear <= bestClear {
+			continue
+		}
+		bestX, bestY, bestClear = x, y, clear
+	}
+	g.arrivals = append(g.arrivals, arrival{kind: kind, x: bestX, y: bestY, left: materialiseTicks})
+}
+
+// clearanceAt is the distance from a point to the nearest thing already in the
+// arena — a live entity, or another vortex about to deliver one.
+func (g *Game) clearanceAt(x, y float64) float64 {
+	clear := math.Inf(1)
+	for i := range g.entities {
+		e := &g.entities[i]
+		if e.kind != kindEnemy || e.hp <= 0 {
+			continue
+		}
+		clear = min(clear, math.Hypot(e.x-x, e.y-y))
+	}
+	for i := range g.arrivals {
+		a := &g.arrivals[i]
+		clear = min(clear, math.Hypot(a.x-x, a.y-y))
+	}
+	return min(clear, math.Hypot(g.x-x, g.y-y))
+}
+
+// stepArrivals runs the vortices down and lands the ships they were for.
+func (g *Game) stepArrivals() {
+	kept := g.arrivals[:0]
+	for _, a := range g.arrivals {
+		a.left--
+		if a.left > 0 {
+			kept = append(kept, a)
+			continue
+		}
+		ha := g.hordeAssetFor(a.kind)
+		g.entities = append(g.entities, enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0))
+	}
+	g.arrivals = kept
+}
+
+// drawArrivals draws the open vortices. Under the entities, because a ship comes
+// OUT of one.
+func (g *Game) drawArrivals(dst *ebiten.Image, cam ebiten.GeoM) {
+	scale := g.camPixelScale()
+	seconds := float64(ebiten.Tick()) / float64(ebiten.TPS())
+	for i := range g.arrivals {
+		a := &g.arrivals[i]
+		age := 1 - float64(a.left)/materialiseTicks // 0 as it opens, 1 as it closes
+		x, y := cam.Apply(a.x, a.y)
+		effects.DrawPortal(dst, effects.Portal{
+			X: x, Y: y,
+			Radius:   arrivalRadius * scale * min(age*arrivalOpenSpeed, 1),
+			Col:      arrivalColor,
+			Seconds:  seconds,
+			Speed:    arrivalMoteSpeed,
+			MoteSize: effects.DefaultMoteSize * arrivalMoteScale,
+			HideRing: true, // a ship materialises; there is no hole here to fly into
+			Fade:     1 - age*age,
+			DPR:      g.dpr,
+			Scale:    scale,
+		})
 	}
 }

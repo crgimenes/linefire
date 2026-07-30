@@ -166,3 +166,76 @@ func TestSkirmishShipIsIndestructible(t *testing.T) {
 		t.Fatalf("the skirmish ship died: over=%v health=%d", g.over, g.health)
 	}
 }
+
+// An arena has no "around the player" to spawn on: ships materialise anywhere on
+// the field, through a vortex that runs before the hull exists.
+func TestSkirmishShipsMaterialiseOnTheField(t *testing.T) {
+	g := newTestSkirmish(t)
+	before := g.enemiesLeft()
+
+	if !g.spawnHordeEnemy() {
+		t.Fatal("the horde could not spawn")
+	}
+	if len(g.arrivals) != 1 {
+		t.Fatalf("%d vortices opened, want 1", len(g.arrivals))
+	}
+	if g.enemiesLeft() != before {
+		t.Fatal("the ship exists already; the vortex is supposed to run first")
+	}
+
+	a := g.arrivals[0]
+	switch {
+	case a.left != materialiseTicks:
+		t.Errorf("vortex opened with %d ticks, want %d", a.left, materialiseTicks)
+	case a.x < g.bounds.minX+arrivalInset || a.x > g.bounds.maxX-arrivalInset:
+		t.Errorf("vortex at x %.0f is not inside the walls", a.x)
+	case a.y < g.bounds.minY+arrivalInset || a.y > g.bounds.maxY-arrivalInset:
+		t.Errorf("vortex at y %.0f is not inside the walls", a.y)
+	}
+
+	for range materialiseTicks {
+		g.stepArrivals()
+	}
+	if len(g.arrivals) != 0 {
+		t.Errorf("%d vortices still open after their whole life", len(g.arrivals))
+	}
+	if g.enemiesLeft() != before+1 {
+		t.Fatal("the vortex closed without landing a ship")
+	}
+	landed := g.entities[len(g.entities)-1]
+	if landed.x != a.x || landed.y != a.y {
+		t.Errorf("ship landed at %.0f,%.0f, not at the vortex %.0f,%.0f", landed.x, landed.y, a.x, a.y)
+	}
+}
+
+// Arrivals are spread: pure random dropped ships on top of each other.
+func TestSkirmishArrivalsAvoidWhatIsAlreadyThere(t *testing.T) {
+	g := newTestSkirmish(t)
+	for range 6 {
+		if !g.spawnHordeEnemy() {
+			t.Fatal("spawn failed")
+		}
+	}
+	for i := range g.arrivals {
+		for j := i + 1; j < len(g.arrivals); j++ {
+			a, b := g.arrivals[i], g.arrivals[j]
+			if d := math.Hypot(a.x-b.x, a.y-b.y); d < arrivalRadius {
+				t.Errorf("two vortices %.0f apart, closer than one is wide (%.0f)", d, float64(arrivalRadius))
+			}
+		}
+	}
+}
+
+// The arena camera shows the whole field, so a minimap of it is clutter — and
+// jolting the whole view because one ship of sixteen was hit reads as a fault.
+func TestSkirmishHasNoShake(t *testing.T) {
+	g := newTestSkirmish(t)
+	g.addShake(20)
+	if g.shakeMag != 0 {
+		t.Fatalf("shake is %.1f; an arena camera does not shake", g.shakeMag)
+	}
+	g.updateShakeOffset()
+	if g.shakeX != 0 || g.shakeY != 0 {
+		t.Errorf("shake offset %.1f,%.1f", g.shakeX, g.shakeY)
+	}
+}

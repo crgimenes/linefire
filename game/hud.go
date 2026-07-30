@@ -191,7 +191,11 @@ func (g *Game) drawHUDContent(dst *ebiten.Image) {
 	}
 
 	g.drawLog(dst)
-	g.drawMinimap(dst)
+	if !g.arenaCam {
+		// The minimap maps a cave you can only see part of. An arena camera shows
+		// the whole field already, so a small copy of it in the corner is clutter.
+		g.drawMinimap(dst)
+	}
 	g.drawWeaponSlots(dst)
 
 	if g.debugHUD || webDebug {

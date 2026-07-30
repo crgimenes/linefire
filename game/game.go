@@ -186,20 +186,21 @@ type Game struct {
 	endKind          int           // endNone/endDeath/endWin: the queued end screen, delayed so effects play out
 	endTicks         int           // frames left before the queued end screen appears
 
-	titleMode       bool     // the front-door title screen is up (attract demo + "press space to start")
-	creditsMode     bool     // the credits attract screen is running (autonomous demo + scroll)
-	skirmishMode    bool     // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
-	transparent     bool     // the screen alpha is real (a transparent window): no background fill, no fog
-	arenaCam        bool     // the camera is a fixed view of the whole arena (see camPose)
-	creditsPlayable bool     // the Konami code handed control to the player
-	creditsScroll   float64  // credits vertical scroll offset (logical px)
-	konamiN         int      // progress through the Konami sequence
-	creditsWanderX  float64  // autopilot roam target (world x)
-	creditsWanderY  float64  // autopilot roam target (world y)
-	creditsWanderCD int      // frames until the autopilot picks a new roam target
-	creditsRegenCD  int      // frames until the attract backdrop is regenerated (a fresh map)
-	attractRecords  []string // the HI score + best times, shown on the title's records page (rebuilt per backdrop)
-	screenReturn    *Game    // the non-playable screen the credits were opened from, so Esc backs out to it (nil = none)
+	titleMode       bool      // the front-door title screen is up (attract demo + "press space to start")
+	creditsMode     bool      // the credits attract screen is running (autonomous demo + scroll)
+	skirmishMode    bool      // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
+	transparent     bool      // the screen alpha is real (a transparent window): no background fill, no fog
+	arenaCam        bool      // the camera is a fixed view of the whole arena (see camPose)
+	arrivals        []arrival // vortices about to deliver a ship (skirmish; see skirmish.go)
+	creditsPlayable bool      // the Konami code handed control to the player
+	creditsScroll   float64   // credits vertical scroll offset (logical px)
+	konamiN         int       // progress through the Konami sequence
+	creditsWanderX  float64   // autopilot roam target (world x)
+	creditsWanderY  float64   // autopilot roam target (world y)
+	creditsWanderCD int       // frames until the autopilot picks a new roam target
+	creditsRegenCD  int       // frames until the attract backdrop is regenerated (a fresh map)
+	attractRecords  []string  // the HI score + best times, shown on the title's records page (rebuilt per backdrop)
+	screenReturn    *Game     // the non-playable screen the credits were opened from, so Esc backs out to it (nil = none)
 
 	// Secondary-weapon aiming. In locked mode the aim is frozen in world space
 	// (via aimRefAngle) so rotating the ship does not swing it.
@@ -733,6 +734,7 @@ func (g *Game) Update() error {
 	g.updateDiscovery()
 	g.stepHorde()
 	g.energyPool().Tick() // the slow trickle back; a pickup is what refills it properly
+	g.stepArrivals()      // vortices land the ships they were opened for (skirmish)
 	g.stepProjectiles()
 	g.stepAllies()
 	g.updateEnemies()
@@ -1239,6 +1241,7 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 
 // drawEntityLayer draws the crisp foreground: enemies, bullets and effects.
 func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, camAngle float64, showPlayer bool) {
+	g.drawArrivals(dst, cam) // under everything: a ship comes OUT of its vortex
 	for i := range g.entities {
 		if g.fogHidden(g.entities[i].x, g.entities[i].y) {
 			continue // hidden in the fog: only visible where the brush has cleared

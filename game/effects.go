@@ -26,6 +26,12 @@ var (
 // addShake bumps the screen-shake magnitude, taking the max so a fresh jolt is
 // not diluted by a smaller one already fading.
 func (g *Game) addShake(amount float64) {
+	if g.arenaCam {
+		// The camera IS the arena. Jolting the whole field because one ship of
+		// sixteen took a hit reads as a fault rather than as impact — and there is
+		// no "your ship" whose hits would justify it.
+		return
+	}
 	if amount > g.shakeMag {
 		g.shakeMag = amount
 	}
