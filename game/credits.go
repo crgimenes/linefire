@@ -112,7 +112,18 @@ func (g *Game) buildCreditsArena() {
 	// empty-target exit portal is inert while the demo runs, so it is just decoration. The arena
 	// declares NO music — the attract soundtrack is driven separately (updateCreditsMusic) so a
 	// full random track plays to its end regardless of when the backdrop swaps.
-	lvl := procgen.GenCaveRoom(int64(randIntN(1<<30)), "") // #nosec G115 -- a display seed, not crypto
+	seed := int64(randIntN(1 << 30)) // #nosec G115 -- a display seed, not crypto
+	// The credits demo fights in a cave; skirmish fights in the open. It is not
+	// only a look: a cave's wall layer is thousands of segments, which the game
+	// affords by drawing caves as negative space and never stroking them — and a
+	// transparent screen has no fills to build that out of, so it must stroke the
+	// walls, and a cave at 60fps it is not (measured: 9).
+	var lvl *level.Level
+	if g.skirmishMode {
+		lvl = procgen.GenArena(seed)
+	} else {
+		lvl = procgen.GenCaveRoom(seed, "")
+	}
 	name := creditsMapName
 	mapDir, startMap := g.mapDir, g.startMap
 	sfx := g.sfx
