@@ -190,6 +190,7 @@ type Game struct {
 	creditsMode     bool     // the credits attract screen is running (autonomous demo + scroll)
 	skirmishMode    bool     // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
 	transparent     bool     // the screen alpha is real (a transparent window): no background fill, no fog
+	arenaCam        bool     // the camera is a fixed view of the whole arena (see camPose)
 	creditsPlayable bool     // the Konami code handed control to the player
 	creditsScroll   float64  // credits vertical scroll offset (logical px)
 	konamiN         int      // progress through the Konami sequence
@@ -437,6 +438,27 @@ func (g *Game) appendCameraAt(m *ebiten.GeoM, x, y, angle float64) {
 	m.Translate(w/2+g.shakeX+g.camPad, h/2+g.shakeY+g.camPad)
 }
 
+// camPose is where the camera sits and how it is turned.
+//
+// Linefire's camera RIDES THE SHIP: the hull is pinned to the centre of the
+// screen pointing up, and the world translates and rotates around it. That is the
+// right camera for one ship you are flying — it is an arcade cabinet, and up is
+// always where you are going.
+//
+// An arena camera does not move at all. It looks at the whole field from outside,
+// because there is no "your ship" to ride: several ships per side are fighting,
+// and a view that turned with one of them would make the other fifteen swing
+// around the screen. So the pose is the middle of the map, held still.
+//
+// Angle -90 is what appendCameraAt turns into zero rotation (it computes
+// -90 - angle), so a still camera needs no separate code path there.
+func (g *Game) camPose() (x, y, angle float64) {
+	if !g.arenaCam {
+		return g.x, g.y, g.angle
+	}
+	return (g.bounds.minX + g.bounds.maxX) / 2, (g.bounds.minY + g.bounds.maxY) / 2, -90
+}
+
 // cameraGeoMAt is the world->screen transform for an explicit camera pose.
 func (g *Game) cameraGeoMAt(x, y, angle float64) ebiten.GeoM {
 	var m ebiten.GeoM
@@ -446,7 +468,7 @@ func (g *Game) cameraGeoMAt(x, y, angle float64) ebiten.GeoM {
 
 // cameraGeoM is the world->screen transform (pure, testable without a window).
 func (g *Game) cameraGeoM() ebiten.GeoM {
-	return g.cameraGeoMAt(g.x, g.y, g.angle)
+	return g.cameraGeoMAt(g.camPose())
 }
 
 // entityGeoMAt places an entity's asset (asset coordinates) at its world position
@@ -469,6 +491,19 @@ func (g *Game) entityGeoM(e *entity) ebiten.GeoM {
 }
 
 // playerGeoM draws the player asset at the screen center, always pointing up.
+// playerWorldGeoM places the player's hull at its world position facing its
+// heading, through the camera — the way every other entity is placed. It is what
+// an arena camera needs: with the camera still, the ship has to move and turn on
+// screen, which is exactly what playerGeoM refuses to do.
+func (g *Game) playerWorldGeoM(camX, camY, camAngle float64) ebiten.GeoM {
+	var m ebiten.GeoM
+	m.Translate(-g.player.Origin.X, -g.player.Origin.Y)
+	m.Rotate((g.angle + 90) * math.Pi / 180)
+	m.Translate(g.x, g.y)
+	g.appendCameraAt(&m, camX, camY, camAngle)
+	return m
+}
+
 func (g *Game) playerGeoM() ebiten.GeoM {
 	var m ebiten.GeoM
 	m.Translate(-g.player.Origin.X, -g.player.Origin.Y)
@@ -943,13 +978,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	showPlayer := g.endKind != endDeath && (g.invuln <= 0 || (ebiten.Tick()/4)%2 == 0)
 
 	screen.Clear()
-	g.accumulateWorld(screen)
+	// With an arena camera the ship is part of the world — it moves and turns on
+	// screen like everything else, so it goes in with the world layer.
+	g.accumulateWorld(screen, showPlayer && g.arenaCam)
 	// Fog of war: a gray layer over everything, cleared where the brush has passed.
 	g.drawBrushFog(screen)
 
 	// The ship: at the screen center, always pointing up, so it never strobes — it
 	// is drawn once, crisp, with its own bloom (never reprojected with the world).
-	if showPlayer {
+	if showPlayer && !g.arenaCam {
 		g.pglow.Bloom(screen, image.Rect(0, 0, g.sw, g.sh), render.GlowOptions{
 			Variant: render.GlowStable, Intensity: 1.2, Spread: 2.5 * g.dpr, Iterations: 2, AntiAlias: true,
 		}, func(emissive *ebiten.Image) {
@@ -1004,16 +1041,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 // the turn rate. The reprojection is exact for 2D content up to resampling and the
 // frame padding (sized so a turn never uncovers a corner). The player is not in the
 // frame (it stays fixed at the screen center); Draw composites it separately.
-func (g *Game) accumulateWorld(dst *ebiten.Image) {
+func (g *Game) accumulateWorld(dst *ebiten.Image, showPlayer bool) {
 	samples := g.blurSamples()
 	m := g.frameMargin()
+	camX, camY, camAngle := g.camPose()
 	if samples == 1 {
 		// Still or slow: one sample is one exact reprojection of the current pose —
 		// identical to rendering straight to the screen. Skip the padded frame and
 		// the fullscreen blit entirely (menus, the title's idle attract, hovering).
 		// The bloom region keeps the PADDED size in both branches so the glow's
 		// offscreen buffers never reallocate on a still<->moving transition.
-		g.drawWorld(dst, image.Rect(0, 0, g.sw+2*m, g.sh+2*m), g.x, g.y, g.angle, false)
+		g.drawWorld(dst, image.Rect(0, 0, g.sw+2*m, g.sh+2*m), camX, camY, camAngle, showPlayer)
 		return
 	}
 
@@ -1023,7 +1061,7 @@ func (g *Game) accumulateWorld(dst *ebiten.Image) {
 
 	// One render of the world at the current pose, centered in the padded frame.
 	g.camPad = pad
-	g.drawWorld(g.frame, image.Rect(0, 0, fw, fh), g.x, g.y, g.angle, false)
+	g.drawWorld(g.frame, image.Rect(0, 0, fw, fh), camX, camY, camAngle, showPlayer)
 	g.camPad = 0
 
 	weight := float32(1) / float32(samples)
@@ -1063,7 +1101,7 @@ func (g *Game) drawWorld(dst *ebiten.Image, region image.Rectangle, camX, camY, 
 		})
 		g.wallMesh.Draw(dst, cam, true)
 		g.drawGoalZones(dst, cam)
-		g.drawEntityLayer(dst, cam, camX, camY, camAngle)
+		g.drawEntityLayer(dst, cam, camX, camY, camAngle, showPlayer)
 		return
 	}
 
@@ -1086,7 +1124,7 @@ func (g *Game) drawWorld(dst *ebiten.Image, region image.Rectangle, camX, camY, 
 		})
 		g.wallMesh.Draw(dst, cam, true)
 		g.drawGoalZones(dst, cam)
-		g.drawEntityLayer(dst, cam, camX, camY, camAngle)
+		g.drawEntityLayer(dst, cam, camX, camY, camAngle, showPlayer)
 		return
 	}
 
@@ -1096,7 +1134,7 @@ func (g *Game) drawWorld(dst *ebiten.Image, region image.Rectangle, camX, camY, 
 		g.drawEntityGlow(emissive, cam, camX, camY, camAngle, showPlayer)
 	})
 	g.drawGoalZones(dst, cam)
-	g.drawEntityLayer(dst, cam, camX, camY, camAngle)
+	g.drawEntityLayer(dst, cam, camX, camY, camAngle, showPlayer)
 }
 
 // drawGoalZones draws a pulsing outline at each "reach" objective's zone, so the
@@ -1188,7 +1226,7 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 		}
 	}
 	if showPlayer && g.playerGlow != nil && !g.playerGlow.Empty() {
-		g.playerGlow.Draw(emissive, g.playerGeoM(), true)
+		g.playerGlow.Draw(emissive, g.playerWorldGeoM(camX, camY, camAngle), true)
 	}
 	g.drawAllyGlow(emissive, camX, camY, camAngle)
 	g.drawLaser(emissive, cam, true)
@@ -1200,12 +1238,15 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 }
 
 // drawEntityLayer draws the crisp foreground: enemies, bullets and effects.
-func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, camAngle float64) {
+func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, camAngle float64, showPlayer bool) {
 	for i := range g.entities {
 		if g.fogHidden(g.entities[i].x, g.entities[i].y) {
 			continue // hidden in the fog: only visible where the brush has cleared
 		}
 		g.drawEntity(dst, cam, &g.entities[i], camX, camY, camAngle)
+	}
+	if showPlayer && g.playerMesh != nil && !g.playerMesh.Empty() {
+		g.playerMesh.Draw(dst, g.playerWorldGeoM(camX, camY, camAngle), true)
 	}
 	g.drawAllies(dst, camX, camY, camAngle) // friendly companions, over the world
 	g.drawLaser(dst, cam, false)
@@ -1226,6 +1267,9 @@ func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, c
 // device pixel ratio: a high-density (Retina) display was paying twice the
 // sub-frames for a gap the eye cannot resolve.
 func (g *Game) blurSamples() int {
+	if g.arenaCam {
+		return 1 // the camera does not move, so there is no camera motion to smear
+	}
 	radius := 0.5 * math.Hypot(float64(g.sw), float64(g.sh))
 	turn := math.Abs(g.angle-g.prevAngle) * math.Pi / 180
 	travel := radius*turn + g.camPixelScale()*math.Hypot(g.x-g.prevX, g.y-g.prevY)
