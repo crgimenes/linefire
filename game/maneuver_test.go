@@ -110,6 +110,24 @@ func TestManeuverFleeOpensTheRange(t *testing.T) {
 	}
 }
 
+// (seek) is the cure for wall blindness: the same wall that stops a (move)
+// pilot dead is walked AROUND by a (seek) pilot, because seek rides the
+// engine's A* — the program says where, the engine knows how.
+func TestManeuverSeekGoesAroundTheWall(t *testing.T) {
+	g := pilotGame(t, `(seek 500 100)`) // the goal is north, behind the wall
+	// A wall across the ship's path, with open space around its ends.
+	g.segs = []segment{{ax: 350, ay: 300, bx: 650, by: 300}}
+	g.nav = buildNavgrid(g.segs, g.bounds)
+
+	for range 900 {
+		g.updateEnemies()
+	}
+	e := &g.entities[0]
+	if d := math.Hypot(e.x-500, e.y-100); d > 60 {
+		t.Fatalf("seeking ship ended %.0f from its goal at (%.0f,%.0f); it should path around the wall", d, e.x, e.y)
+	}
+}
+
 // A program that drives straight into a wall stops at the wall — the engine
 // slides hulls along rock, it never teleports them through. (crg watched
 // piloted ships do exactly this against maze walls: that is the program's

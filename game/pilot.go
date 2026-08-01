@@ -50,6 +50,12 @@ import (
 //	(move dx dy)   desired direction this tick; the engine normalizes it,
 //	               applies THIS hull's speed, separation from neighbours and
 //	               wall sliding. Returns #t.
+//	(seek x y)     navigate TOWARD a world point, riding the engine's
+//	               pathfinding around rock — the same A* the house brain uses:
+//	               the program says where, the engine knows how. Where (move)
+//	               presses blindly into a wall, (seek) goes around it. One
+//	               navigation order per tick — (seek) or (move), the last call
+//	               wins. Returns #t.
 //	(face deg)     aim the hull; the turn rate is the engine's. Without it the
 //	               hull faces its movement. Returns #t.
 //	(fire x y)     shoot at a world point. Lands only if fire-ready (the
@@ -59,15 +65,20 @@ import (
 // Math builtins (Go does the heavy lifting; Filo stays small): (dist x1 y1 x2
 // y2), (bearing x1 y1 x2 y2) -> degrees from point 1 to point 2, (norm-angle
 // deg) -> (-180,180], (sin deg) (cos deg) (atan2 y x) -> degrees, (sqrt v)
-// (abs v) (min a b) (max a b) (clamp v lo hi).
+// (abs v) (mod a b) (floor v) (min a b) (max a b) (clamp v lo hi).
 //
 // Budget: pilotStepLimit evaluation steps and pilotTimeout per tick. A program
 // that errors or blows its budget is reported once per faction on stderr and
 // its ship falls back to the house brain FOR THAT TICK — the show goes on, and
 // the next tick tries the program again.
+// pilotStepLimit is the real per-tick budget: evaluation steps, deterministic
+// and fair. pilotTimeout is only the backstop for a blocked run — wall-clock
+// deadlines trip spuriously under a saturated CPU (the headless runner
+// hammering all cores), so it is deliberately loose; the step limit is what
+// actually cuts a runaway program.
 const (
 	pilotStepLimit = 4000
-	pilotTimeout   = 2 * time.Millisecond
+	pilotTimeout   = 20 * time.Millisecond
 )
 
 // factionAI is one faction's compiled program, shared by all its ships.
@@ -85,10 +96,11 @@ type shipPilot struct {
 }
 
 // pilotOrders is what one tick of a program asked for; the builtins write it
-// through the context, so the shared engine needs no per-ship state.
+// through the context, so the shared engine needs no per-ship state. move and
+// seek share the one navigation slot: the last call wins.
 type pilotOrders struct {
-	moveX, moveY float64
-	hasMove      bool
+	navX, navY   float64
+	nav          string // "", "move" or "seek"
 	faceDeg      float64
 	hasFace      bool
 	fireX, fireY float64
@@ -125,7 +137,19 @@ func newPilotEngine() *filo.Engine {
 		if err != nil {
 			return filo.Value{}, err
 		}
-		o.moveX, o.moveY, o.hasMove = dx, dy, true
+		o.navX, o.navY, o.nav = dx, dy, "move"
+		return filo.VBool(true), nil
+	})
+	order("seek", 2, func(o *pilotOrders, args []filo.Value) (filo.Value, error) {
+		x, err := args[0].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		y, err := args[1].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		o.navX, o.navY, o.nav = x, y, "seek"
 		return filo.VBool(true), nil
 	})
 	order("face", 1, func(o *pilotOrders, args []filo.Value) (filo.Value, error) {
@@ -174,6 +198,8 @@ func newPilotEngine() *filo.Engine {
 	num("atan2", 2, func(a []float64) float64 { return math.Atan2(a[0], a[1]) * 180 / math.Pi })
 	num("sqrt", 1, func(a []float64) float64 { return math.Sqrt(a[0]) })
 	num("abs", 1, func(a []float64) float64 { return math.Abs(a[0]) })
+	num("mod", 2, func(a []float64) float64 { return math.Mod(a[0], a[1]) })
+	num("floor", 1, func(a []float64) float64 { return math.Floor(a[0]) })
 	num("min", 2, func(a []float64) float64 { return math.Min(a[0], a[1]) })
 	num("max", 2, func(a []float64) float64 { return math.Max(a[0], a[1]) })
 	num("clamp", 3, func(a []float64) float64 { return math.Min(math.Max(a[0], a[1]), a[2]) })
@@ -237,11 +263,30 @@ func (g *Game) runPilot(e *entity) bool {
 	}
 	p.mem = newMem
 
-	if orders.hasMove && !e.stationary {
+	if orders.nav != "" && !e.stationary {
 		bx, by := e.x, e.y
-		g.applyEnemyMove(e, orders.moveX, orders.moveY, e.moveSpeed())
-		if !orders.hasFace && (e.x != bx || e.y != by) {
+		if orders.nav == "seek" {
+			// The program says where, the engine knows how: the same A*
+			// pursuit the house brain uses, stuck-recovery included, so a
+			// seeking ship goes AROUND rock instead of pressing into it.
+			g.pursuePath(e, orders.navX, orders.navY)
+		} else {
+			g.applyEnemyMove(e, orders.navX, orders.navY, e.moveSpeed())
+		}
+		moved := math.Hypot(e.x-bx, e.y-by)
+		if !orders.hasFace && moved > 0 {
 			e.angle = turnToward(e.angle, math.Atan2(e.y-by, e.x-bx)*180/math.Pi, enemyTurnRate)
+		}
+		if orders.nav == "seek" {
+			if moved < stuckEps {
+				e.stuck++
+				if e.stuck >= stuckLimit {
+					g.unstick(e, orders.navX, orders.navY)
+					e.stuck = 0
+				}
+			} else {
+				e.stuck = 0
+			}
 		}
 	}
 	if orders.hasFace {
