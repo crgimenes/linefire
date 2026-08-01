@@ -199,6 +199,7 @@ type Game struct {
 
 	filoEng    *filo.Engine       // skirmish: the shared Filo engine (see pilot.go)
 	factionAIs map[int]*factionAI // skirmish: compiled program per faction (absent = house brain)
+	ipcDrivers map[int]*IPCDriver // skirmish: external pilot per faction (see ipc.go)
 
 	simRand   *rand.Rand   // headless battle: the seeded simulation dice (nil = the globals)
 	simTick   int          // headless battle: the runner's own clock (ebiten's never ticks without a window)
@@ -643,6 +644,7 @@ func (g *Game) Update() error {
 	switch {
 	case g.skirmishMode:
 		g.stepSkirmishMeta() // only the periodic regen: the overlay window has no player at the keys
+		g.stepIPC()          // feed the external drivers their factions' state
 	case g.creditsMode:
 		if g.titleMode && inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			g.sfx.saveConfig()

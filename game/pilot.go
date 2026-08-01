@@ -262,7 +262,15 @@ func (g *Game) runPilot(e *entity) bool {
 		return false
 	}
 	p.mem = newMem
+	g.applyShipOrders(e, orders)
+	return true
+}
 
+// applyShipOrders is the one gate between "what a driver asked for" and "what
+// the ship does" — shared by the Filo pilots and the IPC drivers, so both fly
+// under exactly the same physics: the hull's own speed, separation, wall
+// sliding, the engine's turn rate and fire cooldown.
+func (g *Game) applyShipOrders(e *entity, orders *pilotOrders) {
 	if orders.nav != "" && !e.stationary {
 		bx, by := e.x, e.y
 		if orders.nav == "seek" {
@@ -300,7 +308,6 @@ func (g *Game) runPilot(e *entity) bool {
 		e.fireCD = eff
 		g.enemyFire(e, orders.fireX, orders.fireY)
 	}
-	return true
 }
 
 // fillInstruments writes this tick's readings into the ship's globals. The
@@ -322,8 +329,23 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	mem["tick"] = filo.VNum(float64(g.currentTick()))
 
 	allies, enemies := g.sensorContacts(e)
-	mem["allies"] = filo.VList(allies)
-	mem["enemies"] = filo.VList(enemies)
+	mem["allies"] = filo.VList(contactsToFilo(allies))
+	mem["enemies"] = filo.VList(contactsToFilo(enemies))
+}
+
+// contactsToFilo encodes contacts as the contract's five-slot lists.
+func contactsToFilo(cs []contact) []filo.Value {
+	out := make([]filo.Value, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, filo.VList([]filo.Value{
+			filo.VString(c.kind),
+			filo.VNum(c.x),
+			filo.VNum(c.y),
+			filo.VNum(c.heading),
+			filo.VNum(c.dist),
+		}))
+	}
+	return out
 }
 
 // currentTick is the simulation clock: the headless runner's own counter when
@@ -344,14 +366,22 @@ func (e *entity) kindName() string {
 	return e.a.Kind
 }
 
+// contact is one sighted ship, in the neutral form both encodings share: the
+// Filo lists and the IPC wire carry these same five fields in this order.
+type contact struct {
+	kind    string
+	x, y    float64
+	heading float64
+	dist    float64
+}
+
 // sensorContacts is what this ship can SEE: every live ship inside its radar
 // with a clear line of sight — rock hides what is behind it, which is the
 // whole point of fighting in a maze. Sorted nearest first, so (head enemies)
 // is always the closest threat.
-func (g *Game) sensorContacts(e *entity) (allies, enemies []filo.Value) {
+func (g *Game) sensorContacts(e *entity) (allies, enemies []contact) {
 	type sighted struct {
-		v    filo.Value
-		d    float64
+		c    contact
 		ally bool
 	}
 	var seen []sighted
@@ -366,23 +396,16 @@ func (g *Game) sensorContacts(e *entity) (allies, enemies []filo.Value) {
 			continue
 		}
 		seen = append(seen, sighted{
-			v: filo.VList([]filo.Value{
-				filo.VString(o.kindName()),
-				filo.VNum(o.x),
-				filo.VNum(o.y),
-				filo.VNum(o.angle),
-				filo.VNum(d),
-			}),
-			d:    d,
+			c:    contact{kind: o.kindName(), x: o.x, y: o.y, heading: o.angle, dist: d},
 			ally: o.faction == e.faction,
 		})
 	}
-	sort.Slice(seen, func(i, j int) bool { return seen[i].d < seen[j].d })
+	sort.Slice(seen, func(i, j int) bool { return seen[i].c.dist < seen[j].c.dist })
 	for _, s := range seen {
 		if s.ally {
-			allies = append(allies, s.v)
+			allies = append(allies, s.c)
 		} else {
-			enemies = append(enemies, s.v)
+			enemies = append(enemies, s.c)
 		}
 	}
 	return allies, enemies

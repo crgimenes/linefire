@@ -450,9 +450,12 @@ func (g *Game) updateEnemies() {
 			e.fireCD--
 		}
 
-		// A piloted ship is flown by its faction's Filo program; the house
-		// brain below is what flies everyone else — and any program the
-		// moment it errors (see runPilot).
+		// A driven ship is flown by its faction's external driver (IPC) or
+		// its Filo program; the house brain below is what flies everyone
+		// else — and any driver the moment it errors or goes silent.
+		if d := g.ipcDrivers[e.faction]; d != nil && g.runIPCShip(d, e) {
+			continue
+		}
 		if e.pilot != nil && g.runPilot(e) {
 			continue
 		}

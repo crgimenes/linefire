@@ -142,6 +142,12 @@ type SkirmishOptions struct {
 	// contract a program flies under is pilot.go's doc. Reading files is the
 	// caller's job: the game takes source text.
 	Programs []string
+
+	// IPC is one external driver per faction, same indexing (nil entry = none).
+	// The caller owns the transport — usually a child process's stdio — and
+	// builds each with NewIPCDriver; the protocol is ipc.go's doc. A faction
+	// cannot have both a Program and a driver.
+	IPC []*IPCDriver
 }
 
 // NewSkirmish builds the faction battle for a transparent desktop window: an
@@ -190,6 +196,19 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 		if err != nil {
 			return nil, err // a broken program fails at launch, not mid-battle
 		}
+	}
+	for i, d := range opts.IPC {
+		if d == nil {
+			continue
+		}
+		if g.factionAIs[i+1] != nil {
+			return nil, fmt.Errorf("faction %d has both a Filo program and an IPC driver; pick one", i+1)
+		}
+		d.faction = i + 1
+		if g.ipcDrivers == nil {
+			g.ipcDrivers = map[int]*IPCDriver{}
+		}
+		g.ipcDrivers[i+1] = d
 	}
 	g.enterCredits() // the autonomous arena: an endless horde, dealt to the factions on arrival
 	g.floodView = false
