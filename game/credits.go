@@ -109,6 +109,7 @@ func (g *Game) buildCreditsArena() {
 	arenaCam := g.arenaCam
 	factions, nextFaction := g.factions, g.nextFaction // the teams survive too (the skin cache lazily refills)
 	skirmishMap := g.skirmishMap
+	filoEng, factionAIs := g.filoEng, g.factionAIs // the programs survive; ships re-instantiate on arrival
 	// The screen size belongs to the WINDOW, not to the world, so it has to survive
 	// a world rebuild. Linefire gets away with losing it because Layout runs again
 	// before the next Update; an arena sized FROM it does not, and would spend a
@@ -167,6 +168,7 @@ func (g *Game) buildCreditsArena() {
 	g.arenaCam = arenaCam
 	g.factions, g.nextFaction = factions, nextFaction
 	g.skirmishMap = skirmishMap
+	g.filoEng, g.factionAIs = filoEng, factionAIs
 	g.sw, g.sh, g.dpr, g.winW, g.winH = sw, sh, dpr, winW, winH
 	if transparent {
 		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry

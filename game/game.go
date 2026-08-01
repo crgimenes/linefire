@@ -16,6 +16,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"github.com/crgimenes/filo"
 	"github.com/crgimenes/linefire/asset"
 	"github.com/crgimenes/linefire/effects"
 	"github.com/crgimenes/linefire/filoio"
@@ -195,6 +196,9 @@ type Game struct {
 	factions     int       // skirmish: how many teams share the arena (0 outside skirmish)
 	nextFaction  int       // skirmish: round-robin cursor so arrivals keep the teams even
 	skirmishMap  string    // skirmish: SkirmishMapArena or SkirmishMapMaze
+
+	filoEng    *filo.Engine       // skirmish: the shared Filo engine (see pilot.go)
+	factionAIs map[int]*factionAI // skirmish: compiled program per faction (absent = house brain)
 
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
 	creditsPlayable bool                          // the Konami code handed control to the player

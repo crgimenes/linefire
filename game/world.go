@@ -33,31 +33,32 @@ type entity struct {
 	x, y       float64
 	angle      float64
 	radius     float64
-	vx, vy     float64 // current steering velocity (smoothed, to damp jitter at corners)
-	power      string  // power-up effect, or the weapon key (front/turret/...) for kindWeapon
-	target     string  // portal destination "map" or "map:label" (kindPortal only)
-	inside     bool    // player currently overlaps (kindWeapon: swap fires once per entry)
-	spawn      int     // index into level.Spawns this came from (per-map persistence)
-	hp         int     // remaining hits before the enemy is destroyed (0 for power-ups)
-	fireCD     int     // frames until this enemy can fire again
-	hitFlash   int     // frames the white impact flash still shows
-	radar      float64 // current engage range; grows when the enemy is hit
-	stationary bool    // turret archetype: never moves, only faces and fires
-	boss       bool    // shielded (invulnerable) until every non-boss enemy on the map is dead
-	fireEvery  int     // archetype fire interval (frames between shots; <=0 = baseline)
-	shotDmg    int     // archetype damage per shot to the player
-	shotSpeed  float64 // archetype projectile speed
-	speedMul   float64 // archetype movement-speed multiplier (1 = baseline)
-	orbitDir   float64 // +1 / -1: which way it circles the player
-	combat     bool    // alerted: tracks the player through walls until they leave the radar
-	standoff   float64 // preferred orbit distance (randomized per enemy so they spread out)
-	path       []vec2  // A* waypoints toward the player when out of line of sight
-	pathStep   int     // index of the next waypoint
-	repathCD   int     // frames until the path is recomputed
-	stuck      int     // frames of no progress while pursuing (triggers an unstick)
-	wanderHead float64 // current heading while patrolling (radians)
-	wanderCD   int     // frames until the patrol picks a new heading
-	alertGrace int     // frames of combat left after losing the player (before giving up)
+	vx, vy     float64    // current steering velocity (smoothed, to damp jitter at corners)
+	power      string     // power-up effect, or the weapon key (front/turret/...) for kindWeapon
+	target     string     // portal destination "map" or "map:label" (kindPortal only)
+	inside     bool       // player currently overlaps (kindWeapon: swap fires once per entry)
+	spawn      int        // index into level.Spawns this came from (per-map persistence)
+	hp         int        // remaining hits before the enemy is destroyed (0 for power-ups)
+	fireCD     int        // frames until this enemy can fire again
+	hitFlash   int        // frames the white impact flash still shows
+	radar      float64    // current engage range; grows when the enemy is hit
+	stationary bool       // turret archetype: never moves, only faces and fires
+	boss       bool       // shielded (invulnerable) until every non-boss enemy on the map is dead
+	fireEvery  int        // archetype fire interval (frames between shots; <=0 = baseline)
+	shotDmg    int        // archetype damage per shot to the player
+	shotSpeed  float64    // archetype projectile speed
+	speedMul   float64    // archetype movement-speed multiplier (1 = baseline)
+	orbitDir   float64    // +1 / -1: which way it circles the player
+	combat     bool       // alerted: tracks the player through walls until they leave the radar
+	standoff   float64    // preferred orbit distance (randomized per enemy so they spread out)
+	path       []vec2     // A* waypoints toward the player when out of line of sight
+	pathStep   int        // index of the next waypoint
+	repathCD   int        // frames until the path is recomputed
+	stuck      int        // frames of no progress while pursuing (triggers an unstick)
+	wanderHead float64    // current heading while patrolling (radians)
+	wanderCD   int        // frames until the patrol picks a new heading
+	alertGrace int        // frames of combat left after losing the player (before giving up)
+	pilot      *shipPilot // skirmish: the Filo program flying this hull (nil = house brain)
 	a          *asset.Asset
 	mesh       *render.Mesh // nil if the asset is missing
 	glowMesh   *render.Mesh // glowing strokes for the bloom, nil if missing
@@ -446,6 +447,13 @@ func (g *Game) updateEnemies() {
 		}
 		if e.fireCD > 0 {
 			e.fireCD--
+		}
+
+		// A piloted ship is flown by its faction's Filo program; the house
+		// brain below is what flies everyone else — and any program the
+		// moment it errors (see runPilot).
+		if e.pilot != nil && g.runPilot(e) {
+			continue
 		}
 
 		tx, ty, hunting := g.enemyTarget(e)

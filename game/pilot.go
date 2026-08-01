@@ -1,0 +1,334 @@
+package game
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"math"
+	"sort"
+	"time"
+
+	"github.com/hajimehoshi/ebiten/v2"
+
+	"github.com/crgimenes/filo"
+)
+
+// A pilot is a Filo program driving a skirmish ship: THE way skirmish is
+// played. The player writes an AI, one program per faction, and the engine
+// instantiates it per ship — every hull of the faction runs its own copy with
+// its own memory (the Core Wars model). Ships without a program fly the house
+// brain (updateEnemies), which is also every program's safety net.
+//
+// THE CONTRACT — one call per ship per tick.
+//
+// Instruments (globals, overwritten every tick; everything the program defines
+// with (def ...) persists to the next tick — that is the ship's memory):
+//
+//	self-x self-y        position, world units
+//	self-vx self-vy      velocity, world units per tick
+//	self-heading         degrees (0 = +x, grows clockwise on screen)
+//	self-hull            hits left before destruction
+//	self-kind            ship type: "enemy" "rusher" "sniper" "tank" ...
+//	self-faction         team number (1..8)
+//	self-speed           this hull's movement speed, world units per tick
+//	self-radar           sensor radius, world units
+//	fire-ready           #t when the gun is off cooldown
+//	field-w field-h      arena size, world units
+//	tick                 the engine's frame counter
+//	first-tick           #t only on this ship's first run: the whole program
+//	                     re-runs every tick, so unconditional (def n 0) would
+//	                     reset n each time — guard memory initialisation with
+//	                     (if first-tick (def n 0))
+//	allies enemies       lists of VISIBLE contacts — inside self-radar AND in
+//	                     line of sight (rock hides what is behind it) — sorted
+//	                     nearest first. Each contact is a list of five values:
+//	                     (kind x y heading dist).
+//
+// Orders (builtins; the last call of each wins; physics stays the engine's —
+// a program steers a ship, it does not teleport one):
+//
+//	(move dx dy)   desired direction this tick; the engine normalizes it,
+//	               applies THIS hull's speed, separation from neighbours and
+//	               wall sliding. Returns #t.
+//	(face deg)     aim the hull; the turn rate is the engine's. Without it the
+//	               hull faces its movement. Returns #t.
+//	(fire x y)     shoot at a world point. Lands only if fire-ready (the
+//	               cooldown is the engine's); rock eats blind shots. Returns
+//	               #t when the shot was actually fired.
+//
+// Math builtins (Go does the heavy lifting; Filo stays small): (dist x1 y1 x2
+// y2), (bearing x1 y1 x2 y2) -> degrees from point 1 to point 2, (norm-angle
+// deg) -> (-180,180], (sin deg) (cos deg) (atan2 y x) -> degrees, (sqrt v)
+// (abs v) (min a b) (max a b) (clamp v lo hi).
+//
+// Budget: pilotStepLimit evaluation steps and pilotTimeout per tick. A program
+// that errors or blows its budget is reported once per faction on stderr and
+// its ship falls back to the house brain FOR THAT TICK — the show goes on, and
+// the next tick tries the program again.
+const (
+	pilotStepLimit = 4000
+	pilotTimeout   = 2 * time.Millisecond
+)
+
+// factionAI is one faction's compiled program, shared by all its ships.
+type factionAI struct {
+	faction  int
+	prog     *filo.Program
+	errShown bool // the first script error is reported once, not 60x/second
+}
+
+// shipPilot is one ship's running instance: the shared program plus this
+// hull's own memory (its globals between ticks).
+type shipPilot struct {
+	ai  *factionAI
+	mem map[string]filo.Value
+}
+
+// pilotOrders is what one tick of a program asked for; the builtins write it
+// through the context, so the shared engine needs no per-ship state.
+type pilotOrders struct {
+	moveX, moveY float64
+	hasMove      bool
+	faceDeg      float64
+	hasFace      bool
+	fireX, fireY float64
+	hasFire      bool
+	e            *entity // the ship being flown (fire-ready lives on its cooldown)
+}
+
+type pilotCtxKey struct{}
+
+// newPilotEngine builds the Filo engine with the skirmish builtins registered.
+// One engine serves every faction: programs differ, the vocabulary does not.
+func newPilotEngine() *filo.Engine {
+	eng := filo.NewEngine()
+
+	order := func(name string, minArgs int, apply func(o *pilotOrders, args []filo.Value) (filo.Value, error)) {
+		eng.MustRegisterBuiltin(name, func(ctx context.Context, args []filo.Value) (filo.Value, error) {
+			if len(args) < minArgs {
+				return filo.Value{}, fmt.Errorf("%s wants %d arguments, got %d", name, minArgs, len(args))
+			}
+			o, ok := ctx.Value(pilotCtxKey{}).(*pilotOrders)
+			if !ok {
+				return filo.Value{}, fmt.Errorf("%s: no ship on this run", name)
+			}
+			return apply(o, args)
+		})
+	}
+
+	order("move", 2, func(o *pilotOrders, args []filo.Value) (filo.Value, error) {
+		dx, err := args[0].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		dy, err := args[1].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		o.moveX, o.moveY, o.hasMove = dx, dy, true
+		return filo.VBool(true), nil
+	})
+	order("face", 1, func(o *pilotOrders, args []filo.Value) (filo.Value, error) {
+		deg, err := args[0].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		o.faceDeg, o.hasFace = deg, true
+		return filo.VBool(true), nil
+	})
+	order("fire", 2, func(o *pilotOrders, args []filo.Value) (filo.Value, error) {
+		x, err := args[0].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		y, err := args[1].AsNumber()
+		if err != nil {
+			return filo.Value{}, err
+		}
+		o.fireX, o.fireY, o.hasFire = x, y, true
+		return filo.VBool(o.e.fireCD <= 0), nil
+	})
+
+	num := func(name string, nargs int, f func(a []float64) float64) {
+		eng.MustRegisterBuiltin(name, func(_ context.Context, args []filo.Value) (filo.Value, error) {
+			if len(args) != nargs {
+				return filo.Value{}, fmt.Errorf("%s wants %d arguments, got %d", name, nargs, len(args))
+			}
+			vals := make([]float64, nargs)
+			for i := range args {
+				v, err := args[i].AsNumber()
+				if err != nil {
+					return filo.Value{}, fmt.Errorf("%s: %w", name, err)
+				}
+				vals[i] = v
+			}
+			return filo.VNum(f(vals)), nil
+		})
+	}
+
+	num("dist", 4, func(a []float64) float64 { return math.Hypot(a[2]-a[0], a[3]-a[1]) })
+	num("bearing", 4, func(a []float64) float64 { return math.Atan2(a[3]-a[1], a[2]-a[0]) * 180 / math.Pi })
+	num("norm-angle", 1, func(a []float64) float64 { return normDeg(a[0]) })
+	num("sin", 1, func(a []float64) float64 { return math.Sin(a[0] * math.Pi / 180) })
+	num("cos", 1, func(a []float64) float64 { return math.Cos(a[0] * math.Pi / 180) })
+	num("atan2", 2, func(a []float64) float64 { return math.Atan2(a[0], a[1]) * 180 / math.Pi })
+	num("sqrt", 1, func(a []float64) float64 { return math.Sqrt(a[0]) })
+	num("abs", 1, func(a []float64) float64 { return math.Abs(a[0]) })
+	num("min", 2, func(a []float64) float64 { return math.Min(a[0], a[1]) })
+	num("max", 2, func(a []float64) float64 { return math.Max(a[0], a[1]) })
+	num("clamp", 3, func(a []float64) float64 { return math.Min(math.Max(a[0], a[1]), a[2]) })
+
+	return eng
+}
+
+// compilePilots compiles one source per faction (1-based: sources[0] drives
+// faction 1). An empty source leaves that faction on the house brain.
+func compilePilots(eng *filo.Engine, sources []string) (map[int]*factionAI, error) {
+	ais := map[int]*factionAI{}
+	for i, src := range sources {
+		if src == "" {
+			continue
+		}
+		prog, err := eng.Compile(src)
+		if err != nil {
+			return nil, fmt.Errorf("faction %d program: %w", i+1, err)
+		}
+		ais[i+1] = &factionAI{faction: i + 1, prog: prog}
+	}
+	return ais, nil
+}
+
+// pilotFor hands a landing ship its faction's program, or nil for the house
+// brain. A new ship is a new mind: memory starts empty.
+func (g *Game) pilotFor(faction int) *shipPilot {
+	ai := g.factionAIs[faction]
+	if ai == nil {
+		return nil
+	}
+	return &shipPilot{ai: ai}
+}
+
+// runPilot executes one tick of the ship's program and applies its orders.
+// It reports false — fall back to the house brain — when the program errors,
+// so a broken script degrades to a dumb ship instead of a dead one.
+func (g *Game) runPilot(e *entity) bool {
+	p := e.pilot
+	orders := &pilotOrders{e: e}
+	ctx := context.WithValue(context.Background(), pilotCtxKey{}, orders)
+
+	mem := p.mem
+	first := mem == nil
+	if first {
+		mem = map[string]filo.Value{}
+	}
+	g.fillInstruments(e, mem)
+	mem["first-tick"] = filo.VBool(first)
+
+	_, newMem, err := p.ai.prog.Execute(ctx, mem, filo.EvalConfig{
+		StepLimit: pilotStepLimit,
+		Timeout:   pilotTimeout,
+	})
+	if err != nil {
+		if !p.ai.errShown {
+			p.ai.errShown = true
+			log.Printf("faction %d program: %v (its ships fall back to the house brain on error)", p.ai.faction, err)
+		}
+		return false
+	}
+	p.mem = newMem
+
+	if orders.hasMove && !e.stationary {
+		bx, by := e.x, e.y
+		g.applyEnemyMove(e, orders.moveX, orders.moveY, e.moveSpeed())
+		if !orders.hasFace && (e.x != bx || e.y != by) {
+			e.angle = turnToward(e.angle, math.Atan2(e.y-by, e.x-bx)*180/math.Pi, enemyTurnRate)
+		}
+	}
+	if orders.hasFace {
+		e.angle = turnToward(e.angle, orders.faceDeg, enemyTurnRate)
+	}
+	if orders.hasFire && e.fireCD <= 0 {
+		eff := e.fireEvery
+		if eff <= 0 {
+			eff = enemyFireInterval
+		}
+		e.fireCD = eff
+		g.enemyFire(e, orders.fireX, orders.fireY)
+	}
+	return true
+}
+
+// fillInstruments writes this tick's readings into the ship's globals. The
+// program's own defs in the same map are left alone: that is its memory.
+func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
+	mem["self-x"] = filo.VNum(e.x)
+	mem["self-y"] = filo.VNum(e.y)
+	mem["self-vx"] = filo.VNum(e.vx)
+	mem["self-vy"] = filo.VNum(e.vy)
+	mem["self-heading"] = filo.VNum(e.angle)
+	mem["self-hull"] = filo.VNum(float64(e.hp))
+	mem["self-kind"] = filo.VString(e.kindName())
+	mem["self-faction"] = filo.VNum(float64(e.faction))
+	mem["self-speed"] = filo.VNum(e.moveSpeed())
+	mem["self-radar"] = filo.VNum(e.detectRange())
+	mem["fire-ready"] = filo.VBool(e.fireCD <= 0)
+	mem["field-w"] = filo.VNum(g.bounds.w())
+	mem["field-h"] = filo.VNum(g.bounds.h())
+	mem["tick"] = filo.VNum(float64(ebiten.Tick()))
+
+	allies, enemies := g.sensorContacts(e)
+	mem["allies"] = filo.VList(allies)
+	mem["enemies"] = filo.VList(enemies)
+}
+
+// kindName is the ship's archetype name, empty-safe for asset-less markers.
+func (e *entity) kindName() string {
+	if e.a == nil {
+		return ""
+	}
+	return e.a.Kind
+}
+
+// sensorContacts is what this ship can SEE: every live ship inside its radar
+// with a clear line of sight — rock hides what is behind it, which is the
+// whole point of fighting in a maze. Sorted nearest first, so (head enemies)
+// is always the closest threat.
+func (g *Game) sensorContacts(e *entity) (allies, enemies []filo.Value) {
+	type sighted struct {
+		v    filo.Value
+		d    float64
+		ally bool
+	}
+	var seen []sighted
+	radar := e.detectRange()
+	for i := range g.entities {
+		o := &g.entities[i]
+		if o == e || o.kind != kindEnemy || o.hp <= 0 {
+			continue
+		}
+		d := math.Hypot(o.x-e.x, o.y-e.y)
+		if d > radar || !g.lineOfSight(e.x, e.y, o.x, o.y) {
+			continue
+		}
+		seen = append(seen, sighted{
+			v: filo.VList([]filo.Value{
+				filo.VString(o.kindName()),
+				filo.VNum(o.x),
+				filo.VNum(o.y),
+				filo.VNum(o.angle),
+				filo.VNum(d),
+			}),
+			d:    d,
+			ally: o.faction == e.faction,
+		})
+	}
+	sort.Slice(seen, func(i, j int) bool { return seen[i].d < seen[j].d })
+	for _, s := range seen {
+		if s.ally {
+			allies = append(allies, s.v)
+		} else {
+			enemies = append(enemies, s.v)
+		}
+	}
+	return allies, enemies
+}

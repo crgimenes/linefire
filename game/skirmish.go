@@ -136,6 +136,12 @@ type SkirmishOptions struct {
 	Debug    bool   // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
 	Factions int    // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
 	Map      string // SkirmishMapArena (default) or SkirmishMapMaze
+
+	// Programs is one Filo SOURCE per faction (Programs[0] drives faction 1,
+	// and so on); an empty entry leaves that faction on the house brain. The
+	// contract a program flies under is pilot.go's doc. Reading files is the
+	// caller's job: the game takes source text.
+	Programs []string
 }
 
 // NewSkirmish builds the faction battle for a transparent desktop window: an
@@ -177,6 +183,13 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 		g.skirmishMap = SkirmishMapMaze
 	default:
 		return nil, fmt.Errorf("unknown skirmish map %q (want %q or %q)", opts.Map, SkirmishMapArena, SkirmishMapMaze)
+	}
+	if len(opts.Programs) > 0 {
+		g.filoEng = newPilotEngine()
+		g.factionAIs, err = compilePilots(g.filoEng, opts.Programs)
+		if err != nil {
+			return nil, err // a broken program fails at launch, not mid-battle
+		}
 	}
 	g.enterCredits() // the autonomous arena: an endless horde, dealt to the factions on arrival
 	g.floodView = false
@@ -296,6 +309,7 @@ func (g *Game) stepArrivals() {
 		ha := g.factionSkin(a.kind, a.faction)
 		e := enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0)
 		e.faction = a.faction
+		e.pilot = g.pilotFor(a.faction) // a new ship is a new mind: fresh memory
 		g.entities = append(g.entities, e)
 	}
 	g.arrivals = kept
