@@ -29,6 +29,7 @@ const (
 type entity struct {
 	kind       entityKind
 	align      alignment // map-marker classification (good/bad/ally/neutral)
+	faction    int       // team: 0 is the campaign's horde (it preys on the player); skirmish ships are 1..N and prey on each other
 	x, y       float64
 	angle      float64
 	radius     float64
@@ -214,24 +215,24 @@ func buildEntities(content fs.FS, l *level.Level, dir string) []entity {
 }
 
 // orbitHold keeps an engaged, visible enemy near its standoff distance and
-// strafes around the player. It runs only when the player is in sight and close
+// strafes around its target. It runs only when the target is in sight and close
 // (so the enemy is in the open); the long approach is all A*. Wall clearance is
 // handled by the navgrid heat field, not by steering, so there is nothing to
 // fight at a wall tip.
-func (g *Game) orbitHold(e *entity, dist, sd float64) {
-	dx, dy := g.x-e.x, g.y-e.y
+func (g *Game) orbitHold(e *entity, tx, ty, dist, sd float64) {
+	dx, dy := tx-e.x, ty-e.y
 	if dist == 0 {
 		return
 	}
-	tx, ty := dx/dist, dy/dist // unit vector toward the player
+	ux, uy := dx/dist, dy/dist // unit vector toward the target
 
 	radial := 0.0
 	if dist < sd-enemyStandoffBand {
 		radial = -1 // too close: back off so it never sits on the ship
 	}
-	perpX, perpY := -ty, tx
-	vx := tx*radial + perpX*e.orbitDir*enemyOrbit
-	vy := ty*radial + perpY*e.orbitDir*enemyOrbit
+	perpX, perpY := -uy, ux
+	vx := ux*radial + perpX*e.orbitDir*enemyOrbit
+	vy := uy*radial + perpY*e.orbitDir*enemyOrbit
 	g.applyEnemyMove(e, vx, vy, e.moveSpeed())
 }
 
@@ -262,35 +263,35 @@ func (g *Game) applyEnemyMove(e *entity, vx, vy, speed float64) {
 	}
 }
 
-// shouldHold reports whether an engaged enemy sits at its standoff and orbits instead
-// of closing in. It never holds when the player is inside rock they BLASTED OPEN: an
-// orbit needs open space all around the target, and a burrow has none — so the enemy
-// stops circling the mouth and comes in after them.
-func (g *Game) shouldHold(dist, sd float64, los bool) bool {
+// shouldHold reports whether an engaged enemy sits at its standoff and orbits
+// instead of closing in. It never holds when the target sits inside rock BLASTED
+// OPEN: an orbit needs open space all around the target, and a burrow has none —
+// so the enemy stops circling the mouth and comes in after it.
+func (g *Game) shouldHold(tx, ty, dist, sd float64, los bool) bool {
 	if !los || dist > sd+enemyStandoffBand {
 		return false
 	}
-	return !g.playerInDug()
+	return !g.targetInDug(tx, ty)
 }
 
-// playerInDug reports whether the ship is inside a tunnel or crater blasted out of
-// the rock (as opposed to an authored corridor).
-func (g *Game) playerInDug() bool {
-	return g.flood != nil && g.flood.dugAt(g.x, g.y)
+// targetInDug reports whether a point is inside a tunnel or crater blasted out
+// of the rock (as opposed to an authored corridor).
+func (g *Game) targetInDug(x, y float64) bool {
+	return g.flood != nil && g.flood.dugAt(x, y)
 }
 
-// pursuePath chases the player around walls using the A* path, recomputed on a
-// cooldown since the player keeps moving. Without a usable path it heads straight
+// pursuePath chases the target around walls using the A* path, recomputed on a
+// cooldown since the target keeps moving. Without a usable path it heads straight
 // (sliding along walls) as a fallback.
-func (g *Game) pursuePath(e *entity) {
+func (g *Game) pursuePath(e *entity, tx, ty float64) {
 	if g.nav == nil {
-		g.steerToward(e, g.x, g.y)
+		g.steerToward(e, tx, ty)
 		return
 	}
 	if e.repathCD > 0 {
 		e.repathCD--
 	} else {
-		e.path = g.nav.findPath(e.x, e.y, g.x, g.y)
+		e.path = g.nav.findPath(e.x, e.y, tx, ty)
 		e.pathStep = 0
 		e.repathCD = repathInterval
 	}
@@ -309,7 +310,7 @@ func (g *Game) pursuePath(e *entity) {
 		wp := e.path[e.pathStep]
 		g.steerToward(e, wp.x, wp.y)
 	} else {
-		g.steerToward(e, g.x, g.y)
+		g.steerToward(e, tx, ty)
 	}
 }
 
@@ -403,7 +404,33 @@ func (g *Game) moveEnemy(e *entity, dx, dy float64) {
 	}
 }
 
-// updateEnemies turns each enemy to face the player and fires at it on a
+// enemyTarget is what this ship hunts: the player in the campaign — its horde
+// has no other prey — or the nearest ship of ANOTHER faction in skirmish, where
+// the player ship does not exist and the factions prey on each other. ok is
+// false when there is nothing left to hunt (the last foe just died): patrol.
+func (g *Game) enemyTarget(e *entity) (tx, ty float64, ok bool) {
+	if !g.skirmishMode {
+		return g.x, g.y, true
+	}
+	best := -1
+	bd := math.Inf(1)
+	for i := range g.entities {
+		o := &g.entities[i]
+		if o.kind != kindEnemy || o.faction == e.faction || o.hp <= 0 {
+			continue
+		}
+		d := (o.x-e.x)*(o.x-e.x) + (o.y-e.y)*(o.y-e.y)
+		if d < bd {
+			best, bd = i, d
+		}
+	}
+	if best < 0 {
+		return 0, 0, false
+	}
+	return g.entities[best].x, g.entities[best].y, true
+}
+
+// updateEnemies turns each enemy to face its target and fires at it on a
 // cooldown. Position is left fixed for now; movement comes later.
 func (g *Game) updateEnemies() {
 	for i := range g.entities {
@@ -418,10 +445,17 @@ func (g *Game) updateEnemies() {
 			e.fireCD--
 		}
 
-		dx, dy := g.x-e.x, g.y-e.y
+		tx, ty, hunting := g.enemyTarget(e)
+		if !hunting {
+			if !e.stationary {
+				g.patrol(e) // nothing left to hunt: wander
+			}
+			continue
+		}
+		dx, dy := tx-e.x, ty-e.y
 		r := e.detectRange()
 		inRange := dx*dx+dy*dy <= r*r
-		los := inRange && g.lineOfSight(e.x, e.y, g.x, g.y)
+		los := inRange && g.lineOfSight(e.x, e.y, tx, ty)
 
 		if !g.enemyEngaged(e, inRange, los) {
 			if !e.stationary {
@@ -432,12 +466,12 @@ func (g *Game) updateEnemies() {
 
 		dist := math.Hypot(dx, dy)
 		if e.stationary {
-			// Turret: never moves; only swings to track the player when in sight.
+			// Turret: never moves; only swings to track the target when in sight.
 			if los {
 				e.angle = turnToward(e.angle, math.Atan2(dy, dx)*180/math.Pi, enemyTurnRate)
 			}
 		} else {
-			g.moveEnemyEngaged(e, dx, dy, dist, los)
+			g.moveEnemyEngaged(e, tx, ty, dist, los)
 		}
 
 		// Fire only with a clear line of sight: it cannot shoot through walls. An
@@ -450,32 +484,32 @@ func (g *Game) updateEnemies() {
 			continue
 		}
 		e.fireCD = eff
-		g.enemyFire(e)
+		g.enemyFire(e, tx, ty)
 	}
 }
 
 // moveEnemyEngaged runs a mobile enemy's engaged movement: hold/orbit at the
-// standoff when the player is in sight and close (it is in the open then), else
-// navigate toward them by A* (heat-cost paths keep clear of walls) regardless of
+// standoff when the target is in sight and close (it is in the open then), else
+// navigate toward it by A* (heat-cost paths keep clear of walls) regardless of
 // sight. It faces its aim/flight direction and breaks free if pinned at a corner.
-func (g *Game) moveEnemyEngaged(e *entity, dx, dy, dist float64, los bool) {
+func (g *Game) moveEnemyEngaged(e *entity, tx, ty, dist float64, los bool) {
 	sd := e.standoff
 	if sd <= 0 {
 		sd = enemyStandoff
 	}
-	holding := g.shouldHold(dist, sd, los)
+	holding := g.shouldHold(tx, ty, dist, sd, los)
 
 	bx, by := e.x, e.y
 	if holding {
-		g.orbitHold(e, dist, sd)
+		g.orbitHold(e, tx, ty, dist, sd)
 	} else {
-		g.pursuePath(e)
+		g.pursuePath(e, tx, ty)
 	}
 	moved := math.Hypot(e.x-bx, e.y-by)
 
-	// Face the player to aim when visible, else face the flight direction.
+	// Face the target to aim when visible, else face the flight direction.
 	if los {
-		e.angle = turnToward(e.angle, math.Atan2(dy, dx)*180/math.Pi, enemyTurnRate)
+		e.angle = turnToward(e.angle, math.Atan2(ty-e.y, tx-e.x)*180/math.Pi, enemyTurnRate)
 	} else if moved >= stuckEps {
 		e.angle = turnToward(e.angle, math.Atan2(e.y-by, e.x-bx)*180/math.Pi, enemyTurnRate)
 	}
@@ -546,9 +580,9 @@ func (g *Game) patrol(e *entity) {
 	e.angle = turnToward(e.angle, target, enemyTurnRate)
 }
 
-// enemyFire spawns one enemy bullet aimed at the player's current position.
-func (g *Game) enemyFire(e *entity) {
-	dx, dy := g.x-e.x, g.y-e.y
+// enemyFire spawns one enemy bullet aimed at the target's current position.
+func (g *Game) enemyFire(e *entity, tx, ty float64) {
+	dx, dy := tx-e.x, ty-e.y
 	d := math.Hypot(dx, dy)
 	if d == 0 {
 		return
@@ -557,15 +591,21 @@ func (g *Game) enemyFire(e *entity) {
 	if speed <= 0 {
 		speed = enemyBulletSpeed
 	}
+	// The same render payload every other shot carries, so an enemy bolt is the
+	// player's effect in another color rather than its own thing. A faction ship
+	// fires in its faction's color: the bolt says whose it is at a glance.
+	rcol, rglow := enemyShotColor, enemyShotGlowColor
+	if e.faction > 0 {
+		rcol, rglow = factionShotColors(e.faction)
+	}
 	g.enemyShots = append(g.enemyShots, projectile{
 		x: e.x, y: e.y, px: e.x, py: e.y,
-		vx:   dx / d * speed,
-		vy:   dy / d * speed,
-		life: enemyBulletLife,
-		dmg:  e.shotDmg,
-		// The same render payload every other shot carries, so an enemy bolt is
-		// the player's effect in another color rather than its own thing.
-		rcol: enemyShotColor, rglow: enemyShotGlowColor, width: bulletWidth, glowW: bulletGlowWidth,
+		vx:      dx / d * speed,
+		vy:      dy / d * speed,
+		life:    enemyBulletLife,
+		dmg:     e.shotDmg,
+		faction: e.faction,
+		rcol:    rcol, rglow: rglow, width: bulletWidth, glowW: bulletGlowWidth,
 	})
 	// The enemy's own fire sound, when its asset declares one ("fire" has no
 	// fallback on purpose: a full room of default pew-pew would swamp the mix).
@@ -677,8 +717,8 @@ func (g *Game) revealBossIfClear() {
 // resolveContacts damages the player and an enemy when their hulls overlap, so
 // ramming costs both. A brief i-frame keeps it from draining every frame.
 func (g *Game) resolveContacts() {
-	if g.invuln > 0 || g.over {
-		return
+	if g.skirmishMode || g.invuln > 0 || g.over {
+		return // in skirmish there is no player hull: nothing rams a ghost
 	}
 	for i := range g.entities {
 		e := &g.entities[i]

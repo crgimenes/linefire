@@ -107,6 +107,7 @@ func (g *Game) buildCreditsArena() {
 	scroll, konami, playable, title := g.creditsScroll, g.konamiN, g.creditsPlayable, g.titleMode
 	skirmish, transparent, debug := g.skirmishMode, g.transparent, g.debugHUD // the overlay flags survive the regen too
 	arenaCam := g.arenaCam
+	factions, nextFaction := g.factions, g.nextFaction // the teams survive too (the skin cache lazily refills)
 	// The screen size belongs to the WINDOW, not to the world, so it has to survive
 	// a world rebuild. Linefire gets away with losing it because Layout runs again
 	// before the next Update; an arena sized FROM it does not, and would spend a
@@ -157,6 +158,7 @@ func (g *Game) buildCreditsArena() {
 	g.creditsScroll, g.konamiN, g.creditsPlayable, g.titleMode = scroll, konami, playable, title
 	g.skirmishMode, g.transparent, g.debugHUD = skirmish, transparent, debug
 	g.arenaCam = arenaCam
+	g.factions, g.nextFaction = factions, nextFaction
 	g.sw, g.sh, g.dpr, g.winW, g.winH = sw, sh, dpr, winW, winH
 	if transparent {
 		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry

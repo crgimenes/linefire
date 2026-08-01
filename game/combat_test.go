@@ -274,14 +274,14 @@ func TestEnemyApproachAndOrbitHold(t *testing.T) {
 	g := &Game{}
 	g.x, g.y = 0, 0
 	g.entities = []entity{{kind: kindEnemy, x: 1000, y: 0, radius: 10, orbitDir: 1}}
-	g.pursuePath(&g.entities[0])
+	g.pursuePath(&g.entities[0], g.x, g.y)
 	if g.entities[0].x >= 1000 {
 		t.Fatalf("far enemy should close in, x=%v", g.entities[0].x)
 	}
 
 	// Too close: orbitHold backs it off the standoff.
 	g.entities = []entity{{kind: kindEnemy, x: 50, y: 0, radius: 10, orbitDir: 1, standoff: enemyStandoff}}
-	g.orbitHold(&g.entities[0], 50, enemyStandoff)
+	g.orbitHold(&g.entities[0], g.x, g.y, 50, enemyStandoff)
 	if g.entities[0].x <= 50 {
 		t.Fatalf("too-close enemy should back off, x=%v", g.entities[0].x)
 	}

@@ -49,6 +49,12 @@ const (
 	enemyBulletLife   = 150                 // frames
 	enemyFireInterval = ship.BaseFireEvery  // frames between an enemy's shots
 	enemyBulletDamage = ship.BaseShotDamage // health lost when an enemy shot connects
+
+	// shipShotHullDamage is what a ship's bolt does to another SHIP's hull
+	// (skirmish faction fire). Enemy shot damage (shotDmg) is in player-HEALTH
+	// units (16-32 per hit); hulls count hits (BaseHP-scale), so ship-vs-ship
+	// lands like the player's front gun: one point, one hit.
+	shipShotHullDamage = 1
 )
 
 var (
@@ -70,10 +76,11 @@ type projectile struct {
 	vx, vy float64
 	life   int
 
-	dmg  int        // hull damage on hit (the center damage for an AoE shot)
-	col  color.RGBA // floating damage-number color for this shot's source
-	aoe  float64    // explosion radius in world units; 0 = direct-hit only
-	seek float64    // homing turn rate, radians/frame (0 = flies straight)
+	dmg     int        // hull damage on hit (the center damage for an AoE shot)
+	col     color.RGBA // floating damage-number color for this shot's source
+	aoe     float64    // explosion radius in world units; 0 = direct-hit only
+	seek    float64    // homing turn rate, radians/frame (0 = flies straight)
+	faction int        // the shooter's team (enemy shots): its own kind is never hit
 
 	rcol  color.RGBA // core render color (per-weapon, so one pool draws every shot)
 	rglow color.RGBA // glow render color
@@ -239,7 +246,19 @@ func (g *Game) stepEnemyShots() {
 			g.emitBurst(rx, ry, sparks)
 			continue
 		}
-		if g.invuln <= 0 && distPointSegmentSq(g.x, g.y, p.px, p.py, nx, ny) <= g.radius*g.radius {
+		// Ship-vs-ship: a faction bolt lands on the first hull of another
+		// faction in its path. The campaign's horde is all faction 0, so its
+		// own fire keeps passing through its own kind, exactly as before.
+		if hit := g.bulletHitsFoe(p.px, p.py, nx, ny, p.faction); hit >= 0 {
+			g.damageEnemy(hit, shipShotHullDamage, p.rglow)
+			q := p
+			q.dmg = shipShotHullDamage // sparks scale with the hull damage dealt, not the player-unit payload
+			g.impactBurst(nx, ny, &q, true)
+			continue
+		}
+		// The player test: in skirmish there is no player ship to hit — the
+		// autopilot ghost is parked outside the fight and must not soak fire.
+		if !g.skirmishMode && g.invuln <= 0 && distPointSegmentSq(g.x, g.y, p.px, p.py, nx, ny) <= g.radius*g.radius {
 			if g.reflectTime > 0 {
 				p.x, p.y = nx, ny
 				g.reflectShot(&p) // deflect it back as a player shot instead of taking damage
@@ -317,6 +336,23 @@ func (g *Game) bulletHitsEnemy(ax, ay, bx, by float64) int {
 	for i := range g.entities {
 		e := &g.entities[i]
 		if e.kind != kindEnemy {
+			continue
+		}
+		if distPointSegmentSq(e.x, e.y, ax, ay, bx, by) <= e.radius*e.radius {
+			return i
+		}
+	}
+	return -1
+}
+
+// bulletHitsFoe is bulletHitsEnemy for a faction bolt: the first live ship of a
+// DIFFERENT faction within the travel segment, or -1. Same-faction hulls pass
+// untouched — which in the campaign is every hull, since the horde is all
+// faction 0 and so are its shots.
+func (g *Game) bulletHitsFoe(ax, ay, bx, by float64, faction int) int {
+	for i := range g.entities {
+		e := &g.entities[i]
+		if e.kind != kindEnemy || e.faction == faction || e.hp <= 0 {
 			continue
 		}
 		if distPointSegmentSq(e.x, e.y, ax, ay, bx, by) <= e.radius*e.radius {

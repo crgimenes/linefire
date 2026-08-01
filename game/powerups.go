@@ -29,8 +29,8 @@ const (
 // resolvePickups collects any power-up the player is touching, applying its
 // effect, spawning a burst and removing it.
 func (g *Game) resolvePickups() {
-	if g.over {
-		return
+	if g.skirmishMode || g.over {
+		return // no player: loot lies where it fell until a ship can want it (Filo, later)
 	}
 	kept := g.entities[:0]
 	for i := range g.entities {

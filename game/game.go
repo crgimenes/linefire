@@ -186,21 +186,25 @@ type Game struct {
 	endKind          int           // endNone/endDeath/endWin: the queued end screen, delayed so effects play out
 	endTicks         int           // frames left before the queued end screen appears
 
-	titleMode       bool      // the front-door title screen is up (attract demo + "press space to start")
-	creditsMode     bool      // the credits attract screen is running (autonomous demo + scroll)
-	skirmishMode    bool      // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
-	transparent     bool      // the screen alpha is real (a transparent window): no background fill, no fog
-	arenaCam        bool      // the camera is a fixed view of the whole arena (see camPose)
-	arrivals        []arrival // vortices about to deliver a ship (skirmish; see skirmish.go)
-	creditsPlayable bool      // the Konami code handed control to the player
-	creditsScroll   float64   // credits vertical scroll offset (logical px)
-	konamiN         int       // progress through the Konami sequence
-	creditsWanderX  float64   // autopilot roam target (world x)
-	creditsWanderY  float64   // autopilot roam target (world y)
-	creditsWanderCD int       // frames until the autopilot picks a new roam target
-	creditsRegenCD  int       // frames until the attract backdrop is regenerated (a fresh map)
-	attractRecords  []string  // the HI score + best times, shown on the title's records page (rebuilt per backdrop)
-	screenReturn    *Game     // the non-playable screen the credits were opened from, so Esc backs out to it (nil = none)
+	titleMode    bool      // the front-door title screen is up (attract demo + "press space to start")
+	creditsMode  bool      // the credits attract screen is running (autonomous demo + scroll)
+	skirmishMode bool      // the attract demo as a desktop overlay: no title/credits text, no meta keys (see skirmish.go)
+	transparent  bool      // the screen alpha is real (a transparent window): no background fill, no fog
+	arenaCam     bool      // the camera is a fixed view of the whole arena (see camPose)
+	arrivals     []arrival // vortices about to deliver a ship (skirmish; see skirmish.go)
+	factions     int       // skirmish: how many teams share the arena (0 outside skirmish)
+	nextFaction  int       // skirmish: round-robin cursor so arrivals keep the teams even
+
+	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
+	creditsPlayable bool                          // the Konami code handed control to the player
+	creditsScroll   float64                       // credits vertical scroll offset (logical px)
+	konamiN         int                           // progress through the Konami sequence
+	creditsWanderX  float64                       // autopilot roam target (world x)
+	creditsWanderY  float64                       // autopilot roam target (world y)
+	creditsWanderCD int                           // frames until the autopilot picks a new roam target
+	creditsRegenCD  int                           // frames until the attract backdrop is regenerated (a fresh map)
+	attractRecords  []string                      // the HI score + best times, shown on the title's records page (rebuilt per backdrop)
+	screenReturn    *Game                         // the non-playable screen the credits were opened from, so Esc backs out to it (nil = none)
 
 	// Secondary-weapon aiming. In locked mode the aim is frozen in world space
 	// (via aimRefAngle) so rotating the ship does not swing it.
@@ -704,19 +708,24 @@ func (g *Game) Update() error {
 	}
 	g.stepShieldMods()
 
-	// Pick the auto-fire target first, so manual aimed shots this frame point at it too.
-	g.updateAutoTarget()
-
-	// The credits demo flies itself; otherwise the player drives.
+	// Pick the auto-fire target first, so manual aimed shots this frame point at
+	// it too. In skirmish the player ship does not exist: nothing to fly, no
+	// weapons to auto-fire — every hull in the arena is an entity, on a faction,
+	// hunting the other factions (see enemyTarget).
 	thrusting := false
 	g.boosting = false // the demo never boosts; readManualInput re-sets this each frame
-	if g.creditsMode && !g.creditsPlayable {
+	switch {
+	case g.skirmishMode:
+		// the ghost stays parked: not flown, not drawn, not a target
+	case g.creditsMode && !g.creditsPlayable:
+		g.updateAutoTarget()
 		thrusting = g.autoPilot()
-	} else {
+		g.runAutoFire() // the combat computer auto-fires the aimed mounts (G toggles)
+	default:
+		g.updateAutoTarget()
 		thrusting = g.readManualInput()
+		g.runAutoFire()
 	}
-	// The combat computer auto-fires the mouse-aimed mounts at the target (G toggles).
-	g.runAutoFire()
 
 	// Every fire input has run, so laserOn is settled for this frame.
 	g.stepLaserHeat()
@@ -984,7 +993,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// The ship blinks while invulnerable (just took a life hit) as damage feedback; its
 	// glow blinks with it. Once it is DESTROYED (the game-over aftermath is playing) it is
 	// gone entirely — only its explosion remains. The visibility decision is made once here.
-	showPlayer := g.endKind != endDeath && (g.invuln <= 0 || (ebiten.Tick()/4)%2 == 0)
+	// In skirmish the player ship does not exist — the arena is entities only.
+	showPlayer := !g.skirmishMode && g.endKind != endDeath && (g.invuln <= 0 || (ebiten.Tick()/4)%2 == 0)
 
 	screen.Clear()
 	// With an arena camera the ship is part of the world — it moves and turns on

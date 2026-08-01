@@ -31,8 +31,8 @@ func catForKey(key string) int {
 // arsenal is left on the map (nothing to gain); a new one is taken and consumed for the
 // run. Fires once per entry (rising edge), so sitting on a pickup does not churn.
 func (g *Game) resolveWeaponPickups() {
-	if g.over {
-		return
+	if g.skirmishMode || g.over {
+		return // no player: a dropped weapon stays on the field
 	}
 	kept := g.entities[:0]
 	for i := range g.entities {

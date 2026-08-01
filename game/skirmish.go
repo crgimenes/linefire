@@ -14,8 +14,11 @@ import (
 	"github.com/crgimenes/linefire/weapon"
 )
 
-// Linefire Skirmish is the attract demo as a product: the game running itself on
-// a transparent, undecorated, click-through window over the desktop. This file is
+// Linefire Skirmish is the game running itself on a transparent, undecorated,
+// click-through window over the desktop: two or more FACTIONS of ships fighting
+// each other in an arena. There is no player ship at all — every hull is an
+// entity on a team, hunting the nearest ship of another team (enemyTarget), in
+// its faction's color (factionSkin), firing its faction's bolts. This file is
 // the whole of skirmish mode — everything else is the game as it already is,
 // which is the point. The window itself belongs to the caller (linefire-skirmish
 // sets it up, NeoFrame-style); what the mode owns is the parts of the game that
@@ -67,26 +70,67 @@ const (
 	arrivalInset      = 80 // world units kept clear of the walls, so nothing lands in one
 )
 
-// arrivalColor is the vortex tint: the cool cyan the game marks navigation with.
-var arrivalColor = color.RGBA{0x80, 0xff, 0xff, 0xff}
+// factionPalette is the bright half of the VGA palette: the eight colors that
+// tell up to eight simultaneous teams apart at a glance. The hue carries the
+// faction; the ship art keeps its own saturation and value (render.Retinted),
+// so every hull still reads as linefire art. The achromatic pair (white, grey)
+// desaturates its fleet instead, which is its own look.
+var factionPalette = [...]color.RGBA{
+	{0xff, 0x55, 0x55, 0xff}, // light red
+	{0x55, 0xff, 0xff, 0xff}, // light cyan
+	{0x55, 0xff, 0x55, 0xff}, // light green
+	{0xff, 0x55, 0xff, 0xff}, // light magenta
+	{0xff, 0xff, 0x55, 0xff}, // yellow
+	{0x55, 0x55, 0xff, 0xff}, // light blue
+	{0xff, 0xff, 0xff, 0xff}, // white
+	{0x55, 0x55, 0x55, 0xff}, // dark grey
+}
 
-// arrival is a ship on its way in: what it will be, where it will appear, and how
-// long the vortex has left to run.
+// maxFactions is the practical ceiling crg set: more than eight teams turns the
+// screen to mush, and eight is exactly what the bright VGA colors can name.
+const maxFactions = len(factionPalette)
+
+// factionColor is the team's color; factions count from 1.
+func factionColor(f int) color.RGBA {
+	return factionPalette[(f-1)%maxFactions]
+}
+
+// factionShotColors is the faction's bolt: the same hot-core/colored-halo
+// relationship the horde's orange shot has, in the faction's hue.
+func factionShotColors(f int) (core, glow color.RGBA) {
+	glow = factionColor(f)
+	lighten := func(v uint8) uint8 {
+		return uint8(int(v) + (255-int(v))*2/3) // #nosec G115 -- v plus 2/3 of its headroom to 255 cannot exceed 255
+	}
+	core = color.RGBA{R: lighten(glow.R), G: lighten(glow.G), B: lighten(glow.B), A: 0xff}
+	return core, glow
+}
+
+// factionSkinKey caches one ship kind retinted for one team.
+type factionSkinKey struct {
+	kind    string
+	faction int
+}
+
+// arrival is a ship on its way in: what it will be, whose it will be, where it
+// will appear, and how long the vortex has left to run.
 type arrival struct {
-	kind string
-	x, y float64
-	left int
+	kind    string
+	faction int
+	x, y    float64
+	left    int
 }
 
 type SkirmishOptions struct {
-	Sound bool // create the audio context (default silent)
-	Debug bool // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
+	Sound    bool // create the audio context (default silent)
+	Debug    bool // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
+	Factions int  // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
 }
 
-// NewSkirmish builds the attract demo for a transparent desktop window: the
-// autopilot ship (indestructible, as the attract ship always is), an endless
-// horde, and a fresh procedurally generated arena every ~20 seconds. The caller
-// runs it with ebiten.RunGameWithOptions and ScreenTransparent.
+// NewSkirmish builds the faction battle for a transparent desktop window: an
+// endless horde dealt round-robin across the teams, and a fresh procedurally
+// generated arena every ~20 seconds. The caller runs it with
+// ebiten.RunGameWithOptions and ScreenTransparent.
 func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, error) {
 	player, err := filoio.LoadAssetFS(content, mapDir, "player")
 	if err != nil {
@@ -114,7 +158,8 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 	g.skirmishMode = true // set before enterCredits, which builds the arena from it
 	g.transparent = true
 	g.arenaCam = true
-	g.enterCredits() // the autonomous demo: autopilot, endless horde, indestructible ship
+	g.factions = min(max(opts.Factions, 2), maxFactions)
+	g.enterCredits() // the autonomous arena: an endless horde, dealt to the factions on arrival
 	g.floodView = false
 	g.debugHUD = opts.Debug
 	return g, nil
@@ -158,7 +203,8 @@ func (g *Game) stepSkirmishMeta() {
 // spawnArrival opens a vortex somewhere on the field for a ship of the given
 // kind. The point is random — an arena has no "around the player" to spawn on —
 // but chosen as the clearest of a few draws, so arrivals do not land on top of
-// whatever is already fighting.
+// whatever is already fighting. The team is dealt round-robin, so the factions
+// stay even however long the battle runs.
 func (g *Game) spawnArrival(kind string, rng *rand.Rand) {
 	minX, minY := g.bounds.minX+arrivalInset, g.bounds.minY+arrivalInset
 	spanX := max(g.bounds.maxX-arrivalInset-minX, 1)
@@ -173,7 +219,9 @@ func (g *Game) spawnArrival(kind string, rng *rand.Rand) {
 		}
 		bestX, bestY, bestClear = x, y, clear
 	}
-	g.arrivals = append(g.arrivals, arrival{kind: kind, x: bestX, y: bestY, left: materialiseTicks})
+	faction := g.nextFaction + 1
+	g.nextFaction = (g.nextFaction + 1) % max(g.factions, 1)
+	g.arrivals = append(g.arrivals, arrival{kind: kind, faction: faction, x: bestX, y: bestY, left: materialiseTicks})
 }
 
 // clearanceAt is the distance from a point to the nearest thing already in the
@@ -191,10 +239,11 @@ func (g *Game) clearanceAt(x, y float64) float64 {
 		a := &g.arrivals[i]
 		clear = min(clear, math.Hypot(a.x-x, a.y-y))
 	}
-	return min(clear, math.Hypot(g.x-x, g.y-y))
+	return clear
 }
 
-// stepArrivals runs the vortices down and lands the ships they were for.
+// stepArrivals runs the vortices down and lands the ships they were for, in
+// their faction's colors.
 func (g *Game) stepArrivals() {
 	kept := g.arrivals[:0]
 	for _, a := range g.arrivals {
@@ -203,10 +252,32 @@ func (g *Game) stepArrivals() {
 			kept = append(kept, a)
 			continue
 		}
-		ha := g.hordeAssetFor(a.kind)
-		g.entities = append(g.entities, enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0))
+		ha := g.factionSkin(a.kind, a.faction)
+		e := enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0)
+		e.faction = a.faction
+		g.entities = append(g.entities, e)
 	}
 	g.arrivals = kept
+}
+
+// factionSkin is hordeAssetFor in the team's colors: the same cached asset,
+// its meshes retinted to the faction hue. The geometry is shared — a skin is
+// only a new color table — and cached per (kind, faction) on the Game; a world
+// rebuild drops the cache and it lazily refills.
+func (g *Game) factionSkin(kind string, faction int) hordeAsset {
+	key := factionSkinKey{kind: kind, faction: faction}
+	ha, ok := g.factionSkins[key]
+	if ok {
+		return ha
+	}
+	base := g.hordeAssetFor(kind)
+	col := factionColor(faction)
+	ha = hordeAsset{a: base.a, mesh: base.mesh.Retinted(col), glow: base.glow.Retinted(col)}
+	if g.factionSkins == nil {
+		g.factionSkins = map[factionSkinKey]hordeAsset{}
+	}
+	g.factionSkins[key] = ha
+	return ha
 }
 
 // drawArrivals draws the open vortices. Under the entities, because a ship comes
@@ -221,7 +292,7 @@ func (g *Game) drawArrivals(dst *ebiten.Image, cam ebiten.GeoM) {
 		effects.DrawPortal(dst, effects.Portal{
 			X: x, Y: y,
 			Radius:   arrivalRadius * scale * min(age*arrivalOpenSpeed, 1),
-			Col:      arrivalColor,
+			Col:      factionColor(a.faction), // the vortex announces whose ship is coming
 			Seconds:  seconds,
 			Speed:    arrivalMoteSpeed,
 			MoteSize: effects.DefaultMoteSize * arrivalMoteScale,
