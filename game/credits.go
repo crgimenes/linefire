@@ -108,6 +108,7 @@ func (g *Game) buildCreditsArena() {
 	skirmish, transparent, debug := g.skirmishMode, g.transparent, g.debugHUD // the overlay flags survive the regen too
 	arenaCam := g.arenaCam
 	factions, nextFaction := g.factions, g.nextFaction // the teams survive too (the skin cache lazily refills)
+	skirmishMap := g.skirmishMap
 	// The screen size belongs to the WINDOW, not to the world, so it has to survive
 	// a world rebuild. Linefire gets away with losing it because Layout runs again
 	// before the next Update; an arena sized FROM it does not, and would spend a
@@ -120,16 +121,22 @@ func (g *Game) buildCreditsArena() {
 	// declares NO music — the attract soundtrack is driven separately (updateCreditsMusic) so a
 	// full random track plays to its end regardless of when the backdrop swaps.
 	seed := int64(randIntN(1 << 30)) // #nosec G115 -- a display seed, not crypto
-	// The credits demo fights in a cave; skirmish fights in the open. It is not
-	// only a look: a cave's wall layer is thousands of segments, which the game
-	// affords by drawing caves as negative space and never stroking them — and a
-	// transparent screen has no fills to build that out of, so it must stroke the
-	// walls, and a cave at 60fps it is not (measured: 9).
+	// The credits demo fights in a cave; skirmish fights in its chosen arena:
+	// the open field by default, or the cave generator fitted to the screen as
+	// the maze. A transparent screen has no fills, so the maze's walls are
+	// STROKED — remeasured 2026-07-31 and perfectly affordable (60 fps flat;
+	// merged collinear runs leave only ~100 segments). An earlier "9 fps"
+	// reading blamed on stroking was the macOS window-occlusion throttle, whose
+	// signature is exactly 9 ticks per second.
 	var lvl *level.Level
-	if g.skirmishMode {
+	switch {
+	case g.skirmishMode && g.skirmishMap == SkirmishMapMaze:
+		w, h := g.arenaWorldSize()
+		lvl = procgen.GenCaveArena(seed, w, h)
+	case g.skirmishMode:
 		w, h := g.arenaWorldSize()
 		lvl = procgen.GenArena(seed, w, h)
-	} else {
+	default:
 		lvl = procgen.GenCaveRoom(seed, "")
 	}
 	name := creditsMapName
@@ -159,6 +166,7 @@ func (g *Game) buildCreditsArena() {
 	g.skirmishMode, g.transparent, g.debugHUD = skirmish, transparent, debug
 	g.arenaCam = arenaCam
 	g.factions, g.nextFaction = factions, nextFaction
+	g.skirmishMap = skirmishMap
 	g.sw, g.sh, g.dpr, g.winW, g.winH = sw, sh, dpr, winW, winH
 	if transparent {
 		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry

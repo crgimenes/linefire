@@ -61,7 +61,7 @@ func GenCaveRoom(seed int64, exitTarget string) *level.Level {
 	// #nosec G404 G115 -- deterministic procedural generation (not crypto); the seed's bits are hashed on purpose
 	rng := rand.New(rand.NewPCG(splitmix(uint64(seed)), 0x424f4e5553)) // stream = "BONUS"
 
-	grid, region := carveValidCave(rng)
+	grid, region := carveValidCave(rng, caveRows, caveCols)
 	entry := bottomMost(grid, region)
 	exit := exitCell(grid, region, entry)
 
@@ -89,21 +89,23 @@ const (
 	EdgeBottom
 )
 
-// carveValidCave carves a cave and reduces it to one connected region, retrying a few seeds until
-// the open area is big enough and falling back to an open room if none qualifies.
-func carveValidCave(rng *rand.Rand) ([][]bool, []cell) {
+// carveValidCave carves a rows x cols cave and reduces it to one connected
+// region, retrying a few seeds until the open area is big enough and falling
+// back to an open room if none qualifies. Every helper below reads the grid's
+// own dimensions, so only the carvers need the numbers.
+func carveValidCave(rng *rand.Rand, rows, cols int) ([][]bool, []cell) {
 	var grid [][]bool
 	var region []cell
 	for range caveTries {
-		grid = carveCave(rng)
+		grid = carveCave(rng, rows, cols)
 		region = largestOpenRegion(grid)
-		if float64(len(region)) >= caveMinFrac*float64((caveRows-2)*(caveCols-2)) {
+		if float64(len(region)) >= caveMinFrac*float64((rows-2)*(cols-2)) {
 			break
 		}
 		region = nil
 	}
 	if region == nil {
-		grid, region = openFallback()
+		grid, region = openFallback(rows, cols)
 	}
 	return grid, region
 }
@@ -132,7 +134,7 @@ func GenEdgeRoom(seed int64, entrySide, difficulty int, returnTarget string) *le
 	// #nosec G404 G115 -- deterministic procedural generation (not crypto); the seed's bits are hashed on purpose
 	rng := rand.New(rand.NewPCG(splitmix(uint64(seed)), 0x45444745)) // stream = "EDGE"
 
-	grid, region := carveValidCave(rng)
+	grid, region := carveValidCave(rng, caveRows, caveCols)
 	entry := entryCellForSide(grid, region, entrySide)
 
 	lvl := level.New()
@@ -184,7 +186,7 @@ func GenRiftRoom(seed int64, difficulty int, forwardTarget string) *level.Level 
 	// #nosec G404 G115 -- deterministic procedural generation (not crypto); the seed's bits are hashed on purpose
 	rng := rand.New(rand.NewPCG(splitmix(uint64(seed)), 0x52494654)) // stream = "RIFT"
 
-	grid, region := carveValidCave(rng)
+	grid, region := carveValidCave(rng, caveRows, caveCols)
 	entry := bottomMost(grid, region)
 	exit := exitCell(grid, region, entry)
 
@@ -296,17 +298,17 @@ func cellCenterY(r int) float64 { return float64(r)*caveCell + caveCell/2 }
 // carveCave builds the cave: start solid, carve a handful of chambers, link them with winding
 // corridors (a spanning tree plus a few loop edges for alternate routes), then smooth once for
 // an organic edge. The border stays rock so the room is sealed.
-func carveCave(rng *rand.Rand) [][]bool {
-	grid := make([][]bool, caveRows)
+func carveCave(rng *rand.Rand, rows, cols int) [][]bool {
+	grid := make([][]bool, rows)
 	for r := range grid {
-		grid[r] = make([]bool, caveCols)
+		grid[r] = make([]bool, cols)
 		for c := range grid[r] {
 			grid[r][c] = true // start solid; the chambers and corridors carve the open space
 		}
 	}
 	centers := make([]cell, caveChambers)
 	for i := range centers {
-		centers[i] = cell{1 + rng.IntN(caveRows-2), 1 + rng.IntN(caveCols-2)}
+		centers[i] = cell{1 + rng.IntN(rows-2), 1 + rng.IntN(cols-2)}
 		carveDisk(grid, centers[i], caveChRadMin+rng.IntN(caveChRadMax-caveChRadMin+1))
 	}
 	linkChambers(grid, centers, rng)
@@ -317,15 +319,15 @@ func carveCave(rng *rand.Rand) [][]bool {
 }
 
 // caveInBounds reports whether (r,c) is an interior cell (never the sealed border).
-func caveInBounds(r, c int) bool {
-	return r > 0 && c > 0 && r < caveRows-1 && c < caveCols-1
+func caveInBounds(grid [][]bool, r, c int) bool {
+	return r > 0 && c > 0 && r < len(grid)-1 && c < len(grid[0])-1
 }
 
 // carveDisk opens every interior cell within rad of ctr (a filled disk).
 func carveDisk(grid [][]bool, ctr cell, rad int) {
 	for r := ctr.r - rad; r <= ctr.r+rad; r++ {
 		for c := ctr.c - rad; c <= ctr.c+rad; c++ {
-			if caveInBounds(r, c) && (r-ctr.r)*(r-ctr.r)+(c-ctr.c)*(c-ctr.c) <= rad*rad {
+			if caveInBounds(grid, r, c) && (r-ctr.r)*(r-ctr.r)+(c-ctr.c)*(c-ctr.c) <= rad*rad {
 				grid[r][c] = false
 			}
 		}
@@ -376,12 +378,12 @@ func chamberDist(a, b cell) float64 {
 // width; the endpoint disk guarantees it meets b's chamber.
 func carveCorridor(grid [][]bool, a, b cell, rng *rand.Rand) {
 	r, c := a.r, a.c
-	for guard := 0; (r != b.r || c != b.c) && guard < 4*(caveRows+caveCols); guard++ {
+	for guard := 0; (r != b.r || c != b.c) && guard < 4*(len(grid)+len(grid[0])); guard++ {
 		carveDisk(grid, cell{r, c}, caveCorridorW)
 		if rng.Float64() < caveWobble {
-			if rng.IntN(2) == 0 && caveInBounds(r+1, c) {
+			if rng.IntN(2) == 0 && caveInBounds(grid, r+1, c) {
 				r++
-			} else if caveInBounds(r-1, c) {
+			} else if caveInBounds(grid, r-1, c) {
 				r--
 			}
 			continue
@@ -427,11 +429,11 @@ func caveOpenness(grid [][]bool, x cell) int {
 // smoothCave applies one automata pass: a cell becomes rock when at least five of its eight
 // neighbours are rock (out-of-grid counts as rock), which grows blobs into smooth caverns.
 func smoothCave(grid [][]bool) [][]bool {
-	next := make([][]bool, caveRows)
+	next := make([][]bool, len(grid))
 	for r := range next {
-		next[r] = make([]bool, caveCols)
+		next[r] = make([]bool, len(grid[0]))
 		for c := range next[r] {
-			if r == 0 || c == 0 || r == caveRows-1 || c == caveCols-1 {
+			if r == 0 || c == 0 || r == len(grid)-1 || c == len(grid[0])-1 {
 				next[r][c] = true
 				continue
 			}
@@ -450,7 +452,7 @@ func rockNeighbors(grid [][]bool, r, c int) int {
 				continue
 			}
 			nr, nc := r+dr, c+dc
-			if nr < 0 || nc < 0 || nr >= caveRows || nc >= caveCols || grid[nr][nc] {
+			if nr < 0 || nc < 0 || nr >= len(grid) || nc >= len(grid[0]) || grid[nr][nc] {
 				n++
 			}
 		}
@@ -461,13 +463,13 @@ func rockNeighbors(grid [][]bool, r, c int) int {
 // largestOpenRegion 4-connected-flood-fills the open cells, keeps only the biggest component,
 // and fills every other open cell with rock — leaving one connected cave. Returns its cells.
 func largestOpenRegion(grid [][]bool) []cell {
-	seen := make([][]bool, caveRows)
+	seen := make([][]bool, len(grid))
 	for r := range seen {
-		seen[r] = make([]bool, caveCols)
+		seen[r] = make([]bool, len(grid[0]))
 	}
 	var best []cell
-	for r := range caveRows {
-		for c := range caveCols {
+	for r := range len(grid) {
+		for c := range len(grid[0]) {
 			if grid[r][c] || seen[r][c] {
 				continue
 			}
@@ -482,8 +484,8 @@ func largestOpenRegion(grid [][]bool) []cell {
 	for _, x := range best {
 		inBest[x] = true
 	}
-	for r := range caveRows {
-		for c := range caveCols {
+	for r := range len(grid) {
+		for c := range len(grid[0]) {
 			if !grid[r][c] && !inBest[cell{r, c}] {
 				grid[r][c] = true
 			}
@@ -502,7 +504,7 @@ func floodOpen(grid, seen [][]bool, r, c int) []cell {
 		stack = stack[:len(stack)-1]
 		comp = append(comp, x)
 		for _, n := range neighbors4(x) {
-			if n.r < 0 || n.c < 0 || n.r >= caveRows || n.c >= caveCols {
+			if n.r < 0 || n.c < 0 || n.r >= len(grid) || n.c >= len(grid[0]) {
 				continue
 			}
 			if grid[n.r][n.c] || seen[n.r][n.c] {
@@ -520,13 +522,13 @@ func neighbors4(x cell) [4]cell {
 }
 
 // openFallback is the safety net for a degenerate seed: a plain open room (rock border only).
-func openFallback() ([][]bool, []cell) {
-	grid := make([][]bool, caveRows)
+func openFallback(rows, cols int) ([][]bool, []cell) {
+	grid := make([][]bool, rows)
 	var region []cell
 	for r := range grid {
-		grid[r] = make([]bool, caveCols)
+		grid[r] = make([]bool, cols)
 		for c := range grid[r] {
-			border := r == 0 || c == 0 || r == caveRows-1 || c == caveCols-1
+			border := r == 0 || c == 0 || r == rows-1 || c == cols-1
 			grid[r][c] = border
 			if !border {
 				region = append(region, cell{r, c})
@@ -541,7 +543,7 @@ func openFallback() ([][]bool, []cell) {
 func bottomMost(grid [][]bool, region []cell) cell {
 	best := region[0]
 	bestScore := -math.MaxFloat64
-	mid := float64(caveCols) / 2
+	mid := float64(len(grid[0])) / 2
 	for _, x := range region {
 		score := float64(x.r) - math.Abs(float64(x.c)-mid) + float64(caveOpenness(grid, x)) // low, central, open
 		if score > bestScore {
@@ -559,7 +561,7 @@ func bfsDist(grid [][]bool, start cell) map[cell]int {
 		x := queue[0]
 		queue = queue[1:]
 		for _, n := range neighbors4(x) {
-			if n.r < 0 || n.c < 0 || n.r >= caveRows || n.c >= caveCols || grid[n.r][n.c] {
+			if n.r < 0 || n.c < 0 || n.r >= len(grid) || n.c >= len(grid[0]) || grid[n.r][n.c] {
 				continue
 			}
 			if _, ok := dist[n]; ok {
@@ -614,7 +616,7 @@ var (
 
 // caveRock reports whether cell (r,c) is rock, treating everything off the grid as rock.
 func caveRock(grid [][]bool, r, c int) bool {
-	if r < 0 || c < 0 || r >= caveRows || c >= caveCols {
+	if r < 0 || c < 0 || r >= len(grid) || c >= len(grid[0]) {
 		return true
 	}
 	return grid[r][c]
@@ -629,8 +631,8 @@ func caveRock(grid [][]bool, r, c int) bool {
 func caveWalls(grid [][]bool) []asset.Path {
 	edge := boundaryEdges(grid)
 	var paths []asset.Path
-	for sr := 0; sr <= caveRows; sr++ {
-		for sc := 0; sc <= caveCols; sc++ {
+	for sr := 0; sr <= len(grid); sr++ {
+		for sc := 0; sc <= len(grid[0]); sc++ {
 			for hasBoundaryEdge(edge[sr][sc]) {
 				loop := traceCaveLoop(edge, sr, sc)
 				if p, ok := closedCavePath(loop); ok {
@@ -649,13 +651,14 @@ type vtx struct{ r, c int }
 // open/rock boundary. Each edge is recorded on both of its endpoints so the tracer can walk
 // it from either side.
 func boundaryEdges(grid [][]bool) [][][4]bool {
-	edge := make([][][4]bool, caveRows+1)
+	rows, cols := len(grid), len(grid[0])
+	edge := make([][][4]bool, rows+1)
 	for i := range edge {
-		edge[i] = make([][4]bool, caveCols+1)
+		edge[i] = make([][4]bool, cols+1)
 	}
 	// Horizontal edges (grid line r, spanning c..c+1) split the cells above and below.
-	for r := 0; r <= caveRows; r++ {
-		for c := range caveCols {
+	for r := 0; r <= rows; r++ {
+		for c := range cols {
 			if caveRock(grid, r-1, c) != caveRock(grid, r, c) {
 				edge[r][c][dirRight] = true
 				edge[r][c+1][dirLeft] = true
@@ -663,8 +666,8 @@ func boundaryEdges(grid [][]bool) [][][4]bool {
 		}
 	}
 	// Vertical edges (grid line c, spanning r..r+1) split the cells left and right.
-	for c := 0; c <= caveCols; c++ {
-		for r := range caveRows {
+	for c := 0; c <= cols; c++ {
+		for r := range rows {
 			if caveRock(grid, r, c-1) != caveRock(grid, r, c) {
 				edge[r][c][dirDown] = true
 				edge[r+1][c][dirUp] = true

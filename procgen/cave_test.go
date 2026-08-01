@@ -61,7 +61,7 @@ func TestGenEdgeRoom(t *testing.T) {
 // and the entry, exit and every placed spawn land on open cells inside it.
 func TestCavePipelineConnectedAndPlaced(t *testing.T) {
 	rng := rand.New(rand.NewPCG(splitmix(7), 0x424f4e5553))
-	grid := carveCave(rng)
+	grid := carveCave(rng, caveRows, caveCols)
 	region := largestOpenRegion(grid)
 
 	inRegion := map[cell]bool{}

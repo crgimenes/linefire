@@ -194,6 +194,7 @@ type Game struct {
 	arrivals     []arrival // vortices about to deliver a ship (skirmish; see skirmish.go)
 	factions     int       // skirmish: how many teams share the arena (0 outside skirmish)
 	nextFaction  int       // skirmish: round-robin cursor so arrivals keep the teams even
+	skirmishMap  string    // skirmish: SkirmishMapArena or SkirmishMapMaze
 
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
 	creditsPlayable bool                          // the Konami code handed control to the player
@@ -1224,8 +1225,15 @@ func (g *Game) bloomGlow(dst *ebiten.Image, region image.Rectangle, fill func(*e
 }
 
 // fogHidden reports whether a world point lies under the fog of war (an area the
-// ship's brush has not cleared yet), so entities there can be culled.
+// ship's brush has not cleared yet), so entities there can be culled. Skirmish
+// has no fog: the spectator sees the whole battle, and what a SHIP knows is its
+// own sensors' business (the Filo loop), not the screen's — without this gate
+// the maze culled every ship outside the parked ghost's little discovered
+// circle, showing vortices and bolts with nobody firing them.
 func (g *Game) fogHidden(wx, wy float64) bool {
+	if g.skirmishMode {
+		return false
+	}
 	return g.disc != nil && !g.disc.discoveredAt(wx, wy)
 }
 

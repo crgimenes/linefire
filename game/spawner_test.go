@@ -75,14 +75,14 @@ func TestHordeRampTightensInterval(t *testing.T) {
 
 func TestHordeReachableRejectsOutsideTheMap(t *testing.T) {
 	g := &Game{bounds: bounds{minX: 0, minY: 0, maxX: 100, maxY: 100}}
-	if g.hordeReachable(500, 500) {
+	if g.hordeReachable(500, 500, hordeSpawnClearance) {
 		t.Fatal("a point outside the map bounds must be rejected (enemies dripping off-map)")
 	}
-	if !g.hordeReachable(50, 50) {
+	if !g.hordeReachable(50, 50, hordeSpawnClearance) {
 		t.Fatal("an in-bounds clear point (no walls/nav) should be accepted")
 	}
 	g.segs = []segment{{ax: 40, ay: 40, bx: 60, by: 60}}
-	if g.hordeReachable(50, 50) {
+	if g.hordeReachable(50, 50, hordeSpawnClearance) {
 		t.Fatal("a point on a wall must be rejected")
 	}
 }

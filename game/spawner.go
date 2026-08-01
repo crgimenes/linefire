@@ -117,8 +117,7 @@ func (g *Game) spawnHordeEnemy() bool {
 		// An arena has no "around the player": ships materialise anywhere on the
 		// field, and the vortex is what makes that read as arriving rather than as
 		// popping into existence.
-		g.spawnArrival(kind, h.rng)
-		return true
+		return g.spawnArrival(kind, h.rng)
 	}
 	maxDist := g.hordeSpawnDist()
 	for range hordeSpawnTries {
@@ -126,7 +125,7 @@ func (g *Game) spawnHordeEnemy() bool {
 		d := maxDist * (0.55 + 0.45*h.rng.Float64()) // vary the radius, not just the angle
 		x := g.x + math.Cos(ang)*d
 		y := g.y + math.Sin(ang)*d
-		if !g.hordeReachable(x, y) {
+		if !g.hordeReachable(x, y, hordeSpawnClearance) {
 			continue
 		}
 		ha := g.hordeAssetFor(kind)
@@ -140,9 +139,11 @@ func (g *Game) spawnHordeEnemy() bool {
 // player: in bounds, clear of walls, on a navigable cell, and with an actual A*
 // path to the ship. This is the fix for enemies dripping OUTSIDE the map (past the
 // walls or in a sealed pocket), where they could neither reach the player nor be
-// reached — useless spawns.
-func (g *Game) hordeReachable(x, y float64) bool {
-	if !g.inBounds(x, y) || g.collidesAt(x, y, hordeSpawnClearance) {
+// reached — useless spawns. In skirmish the same test anchors on the parked
+// ghost, which sits at PlayerStart — always inside the carved region — so
+// "reaches the player" still means "is in the connected open space".
+func (g *Game) hordeReachable(x, y, clearance float64) bool {
+	if !g.inBounds(x, y) || g.collidesAt(x, y, clearance) {
 		return false
 	}
 	if g.nav == nil {
@@ -175,9 +176,13 @@ func (g *Game) inBounds(x, y float64) bool {
 }
 
 // hordeAssetFor loads (and caches) the asset and meshes for an enemy kind, resolved
-// as "<mapDir>/<kind>.json". A missing asset yields a nil-mesh marker enemy.
+// as "<mapDir>/<kind>.json". A missing asset yields a nil-mesh marker enemy, and no
+// horde at all (a bare test Game) yields the same marker: nil asset, default radius.
 func (g *Game) hordeAssetFor(kind string) hordeAsset {
 	h := g.horde
+	if h == nil {
+		return hordeAsset{}
+	}
 	if ha, ok := h.assets[kind]; ok {
 		return ha
 	}

@@ -340,17 +340,20 @@ func normDeg(a float64) float64 {
 // unstick frees an enemy whose pursuit steering deadlocked at a wall corner: it
 // forces a fresh path next frame and nudges sideways (trying both directions) to
 // slip off the corner.
-func (g *Game) unstick(e *entity) {
+func (g *Game) unstick(e *entity, tx, ty float64) {
 	e.repathCD = 0
 	e.orbitDir = -e.orbitDir // if pinned while orbiting, try the other way around
-	dx, dy := g.x-e.x, g.y-e.y
+	dx, dy := tx-e.x, ty-e.y
 	d := math.Hypot(dx, dy)
 	if d == 0 {
 		return
 	}
 	// Redirect the smoothed velocity sideways so its inertia stops pulling the
-	// ship back into the wall it was pinned against.
-	nx, ny := -dy/d, dx/d // perpendicular to the player direction
+	// ship back into the wall it was pinned against. Sideways is relative to the
+	// TARGET the ship is actually hunting: measured against anything else (this
+	// once read the player, which in skirmish is the parked ghost), a wedged
+	// ship can be handed two escape directions that are both walls, forever.
+	nx, ny := -dy/d, dx/d // perpendicular to the target direction
 	e.vx, e.vy = nx*e.moveSpeed(), ny*e.moveSpeed()
 	bx, by := e.x, e.y
 	g.moveEnemy(e, e.vx, e.vy)
@@ -519,7 +522,7 @@ func (g *Game) moveEnemyEngaged(e *entity, tx, ty, dist float64, los bool) {
 	if moved < stuckEps {
 		e.stuck++
 		if e.stuck >= stuckLimit {
-			g.unstick(e)
+			g.unstick(e, tx, ty)
 			e.stuck = 0
 		}
 	} else {

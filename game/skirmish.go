@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"image/color"
 	"io/fs"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"github.com/crgimenes/linefire/effects"
 
 	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/procgen"
 	"github.com/crgimenes/linefire/weapon"
 )
 
@@ -121,10 +123,19 @@ type arrival struct {
 	left    int
 }
 
+// Skirmish map modes: the open field is the default show; the maze is the cave
+// generator fitted to the screen, where rock blocks sight lines and shots and
+// the fight happens around corners.
+const (
+	SkirmishMapArena = "arena"
+	SkirmishMapMaze  = "maze"
+)
+
 type SkirmishOptions struct {
-	Sound    bool // create the audio context (default silent)
-	Debug    bool // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
-	Factions int  // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
+	Sound    bool   // create the audio context (default silent)
+	Debug    bool   // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
+	Factions int    // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
+	Map      string // SkirmishMapArena (default) or SkirmishMapMaze
 }
 
 // NewSkirmish builds the faction battle for a transparent desktop window: an
@@ -159,6 +170,14 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 	g.transparent = true
 	g.arenaCam = true
 	g.factions = min(max(opts.Factions, 2), maxFactions)
+	switch opts.Map {
+	case "", SkirmishMapArena:
+		g.skirmishMap = SkirmishMapArena
+	case SkirmishMapMaze:
+		g.skirmishMap = SkirmishMapMaze
+	default:
+		return nil, fmt.Errorf("unknown skirmish map %q (want %q or %q)", opts.Map, SkirmishMapArena, SkirmishMapMaze)
+	}
 	g.enterCredits() // the autonomous arena: an endless horde, dealt to the factions on arrival
 	g.floodView = false
 	g.debugHUD = opts.Debug
@@ -180,11 +199,16 @@ func (g *Game) arenaWorldSize() (w, h float64) {
 
 // arenaFitsView reports whether the current arena still matches what the camera
 // shows. It stops matching the moment the window has a real size (the first
-// arena is built before any Layout) and if the monitor ever changes.
+// arena is built before any Layout) and if the monitor ever changes. The maze
+// snaps to whole cave cells, so it is compared against what the generator would
+// actually produce for this view, not against the raw view size.
 func (g *Game) arenaFitsView() bool {
 	w, h := g.arenaWorldSize()
 	if w <= 0 || h <= 0 || g.level == nil {
 		return true // nothing to compare against yet
+	}
+	if g.skirmishMap == SkirmishMapMaze {
+		w, h = procgen.CaveArenaSize(w, h)
 	}
 	return math.Abs(g.level.Size.W-w) < 1 && math.Abs(g.level.Size.H-h) < 1
 }
@@ -201,27 +225,44 @@ func (g *Game) stepSkirmishMeta() {
 }
 
 // spawnArrival opens a vortex somewhere on the field for a ship of the given
-// kind. The point is random — an arena has no "around the player" to spawn on —
-// but chosen as the clearest of a few draws, so arrivals do not land on top of
-// whatever is already fighting. The team is dealt round-robin, so the factions
-// stay even however long the battle runs.
-func (g *Game) spawnArrival(kind string, rng *rand.Rand) {
+// kind, reporting whether it found a spot. The point is random — an arena has
+// no "around the player" to spawn on — but chosen as the clearest of a few
+// draws, so arrivals do not land on top of whatever is already fighting, and in
+// a maze every candidate must sit in reachable open space: a vortex must never
+// materialise a ship inside rock or in a sealed pocket. A cramped frame may
+// reject every draw; the horde retries next tick. The team is dealt round-robin
+// only when the spawn lands, so the factions stay even however long the battle
+// runs.
+func (g *Game) spawnArrival(kind string, rng *rand.Rand) bool {
 	minX, minY := g.bounds.minX+arrivalInset, g.bounds.minY+arrivalInset
 	spanX := max(g.bounds.maxX-arrivalInset-minX, 1)
 	spanY := max(g.bounds.maxY-arrivalInset-minY, 1)
 
-	bestX, bestY, bestClear := minX, minY, -1.0
+	// The clearance must cover the HULL of what is arriving, not a fixed number:
+	// a ship delivered overlapping rock cannot move in any direction, ever. The
+	// pad gives it room to actually leave, not just to exist.
+	const arrivalHullPad = 8
+	clearance := max(hordeSpawnClearance, assetRadius(g.hordeAssetFor(kind).a)+arrivalHullPad)
+
+	bestX, bestY, bestClear := 0.0, 0.0, -1.0
 	for range arrivalCandidates {
 		x, y := minX+rng.Float64()*spanX, minY+rng.Float64()*spanY
+		if !g.hordeReachable(x, y, clearance) {
+			continue // inside rock, or cut off from the field
+		}
 		clear := g.clearanceAt(x, y)
 		if clear <= bestClear {
 			continue
 		}
 		bestX, bestY, bestClear = x, y, clear
 	}
+	if bestClear < 0 {
+		return false
+	}
 	faction := g.nextFaction + 1
 	g.nextFaction = (g.nextFaction + 1) % max(g.factions, 1)
 	g.arrivals = append(g.arrivals, arrival{kind: kind, faction: faction, x: bestX, y: bestY, left: materialiseTicks})
+	return true
 }
 
 // clearanceAt is the distance from a point to the nearest thing already in the

@@ -412,12 +412,12 @@ func TestNavgridHeatHigherNearWalls(t *testing.T) {
 }
 
 func TestUnstickNudgesSideways(t *testing.T) {
-	g := &Game{x: 100, y: 0} // player to the right
+	g := &Game{x: 100, y: 0} // the player, which is the campaign enemy's target
 	g.entities = []entity{{kind: kindEnemy, x: 0, y: 0, radius: 5, orbitDir: 1}}
 
-	g.unstick(&g.entities[0])
+	g.unstick(&g.entities[0], g.x, g.y)
 	if g.entities[0].y == 0 {
-		t.Fatalf("unstick should nudge sideways (perpendicular to the player), y=%v", g.entities[0].y)
+		t.Fatalf("unstick should nudge sideways (perpendicular to the target), y=%v", g.entities[0].y)
 	}
 	if g.entities[0].repathCD != 0 {
 		t.Fatal("unstick should force a repath")

@@ -67,6 +67,40 @@ func TestArenaShipsNothingToFight(t *testing.T) {
 	}
 }
 
+// The labyrinth arena snaps to whole cave cells, ships nothing to fight, and —
+// unlike the open field's invisible fence — IS its walls: stroked and glowing.
+func TestCaveArenaFitsCellsAndShowsItsWalls(t *testing.T) {
+	lvl := GenCaveArena(5, 3200, 1800)
+	wantW, wantH := CaveArenaSize(3200, 1800)
+	if lvl.Size.W != wantW || lvl.Size.H != wantH {
+		t.Fatalf("size %.0fx%.0f, want the snapped %.0fx%.0f", lvl.Size.W, lvl.Size.H, wantW, wantH)
+	}
+	if lvl.Size.W > 3200 || lvl.Size.H > 1800 {
+		t.Fatal("the maze must snap DOWN: it can never overflow the requested view")
+	}
+	if got := len(lvl.Spawns); got != 0 {
+		t.Errorf("GenCaveArena placed %d spawns; the caller decides what fights", got)
+	}
+	wall := lvl.Walls[0]
+	if wall.StrokeWidth <= 0 || wall.Glow <= 0 {
+		t.Error("a maze IS its walls: they must be stroked and glowing")
+	}
+	if len(wall.Paths) == 0 {
+		t.Fatal("the maze has no wall paths")
+	}
+
+	// The start anchors reachability for whoever parks there: open space, inside.
+	s := lvl.PlayerStart
+	if s.X <= 0 || s.X >= lvl.Size.W || s.Y <= 0 || s.Y >= lvl.Size.H {
+		t.Fatalf("start %.0f,%.0f is outside the maze", s.X, s.Y)
+	}
+
+	a, b := GenCaveArena(42, 3200, 1800), GenCaveArena(42, 3200, 1800)
+	if a.Name != b.Name || a.PlayerStart != b.PlayerStart || len(a.Walls[0].Paths) != len(b.Walls[0].Paths) {
+		t.Error("the same seed produced a different maze")
+	}
+}
+
 // Same seed, same arena — it is generated, so it has to be reproducible.
 func TestArenaIsDeterministic(t *testing.T) {
 	a, b := GenArena(42, 0, 0), GenArena(42, 0, 0)
