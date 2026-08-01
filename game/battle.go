@@ -37,9 +37,10 @@ type BattleOptions struct {
 
 // BattleResult is how one fight ended.
 type BattleResult struct {
-	Winner int         // the faction left standing; 0 = draw (timeout, or mutual destruction)
-	Ticks  int         // how long the fight ran
-	Alive  map[int]int // live hulls per faction at the end
+	Winner int                 // the faction left standing; 0 = draw (timeout, or mutual destruction)
+	Ticks  int                 // how long the fight ran
+	Alive  map[int]int         // live hulls per faction at the end
+	Stats  map[int]*FleetStats // the scoreboard: kills, losses, shots per faction
 }
 
 const (
@@ -95,6 +96,11 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	// The horde is built for its asset cache only — it is never stepped, so a
 	// battle has no reinforcements: the fleets that land are the fleets there are.
 	g.horde = newHorde(level.Horde{Types: battleKinds, Seed: opts.Seed})
+	// The runner IS the lastfleet mode: the match object keeps its scoreboard.
+	g.match, err = newMatch(MatchLastFleet, ships, maxTicks, g.factions)
+	if err != nil {
+		return BattleResult{}, err
+	}
 
 	g.trace.emit(map[string]any{
 		"ev": "battle", "n": opts.Battle, "seed": opts.Seed,
@@ -129,8 +135,10 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 		}
 	}
 	res.Alive = g.aliveByFaction()
+	res.Stats = g.match.Stats
 	g.trace.emit(map[string]any{
 		"ev": "result", "winner": res.Winner, "ticks": res.Ticks, "alive": res.Alive,
+		"stats": res.Stats,
 	})
 	return res, nil
 }

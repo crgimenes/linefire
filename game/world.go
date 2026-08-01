@@ -623,6 +623,7 @@ func (g *Game) enemyFire(e *entity, tx, ty float64) {
 		sid:     e.id,
 		rcol:    rcol, rglow: rglow, width: bulletWidth, glowW: bulletGlowWidth,
 	})
+	g.match.recordShot(e.faction)
 	g.traceShot(e, tx, ty)
 	// The enemy's own fire sound, when its asset declares one ("fire" has no
 	// fallback on purpose: a full room of default pew-pew would swamp the mix).
@@ -641,14 +642,14 @@ func (e *entity) detectRange() float64 {
 // damageEnemy applies dmg to the enemy at index i, destroying it and scoring when
 // its health runs out, and pops a floating damage number colored by its source. A
 // surviving enemy widens its radar so it retaliates against fire from beyond range.
-func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) {
+func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) bool {
 	e := &g.entities[i]
 	if e.boss && g.escortsAlive() {
 		// The boss is shielded until the room is cleared: fire glances off, no damage taken. The
 		// spark tells the player their shots are wasted — kill the escorts first.
 		e.hitFlash = hitFlashFrames
 		g.emitBurst(e.x, e.y, shieldSparks)
-		return
+		return false
 	}
 	e.hp -= dmg
 	g.spawnDamageNumber(e.x, e.y-e.radius, dmg, col)
@@ -656,7 +657,7 @@ func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) {
 		g.traceHit(e, by, dmg)
 		e.hitFlash = hitFlashFrames
 		e.radar = math.Min(e.detectRange()*radarHitBoost, radarRange*radarMaxMul)
-		return
+		return false
 	}
 	g.traceDeath(e, by)
 	x, y := e.x, e.y
@@ -672,6 +673,7 @@ func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) {
 	g.addShake(deathShake)
 	g.maybeDropLoot(kind, x, y) // combat feeds the player
 	g.revealBossIfClear()       // the last escort down drops the boss's shield, with a flourish
+	return true
 }
 
 // spawnClearMargin is how much rock (beyond an entity's own radius) freeBuriedSpawns carves to

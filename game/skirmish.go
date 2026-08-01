@@ -137,6 +137,14 @@ type SkirmishOptions struct {
 	Factions int    // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
 	Map      string // SkirmishMapArena (default) or SkirmishMapMaze
 
+	// The match being fought (see match.go): MatchEndless (default) is the
+	// aquarium; MatchLastFleet and MatchTimed are real battles — Ships hulls
+	// per faction, no reinforcements, rematch on a fresh field after the
+	// outcome. Duration is the timed mode's deadline in SECONDS.
+	Mode     string
+	Ships    int
+	Duration int
+
 	// Programs is one Filo SOURCE per faction (Programs[0] drives faction 1,
 	// and so on); an empty entry leaves that faction on the house brain. The
 	// contract a program flies under is pilot.go's doc. Reading files is the
@@ -210,7 +218,14 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 		}
 		g.ipcDrivers[i+1] = d
 	}
-	g.enterCredits() // the autonomous arena: an endless horde, dealt to the factions on arrival
+	g.match, err = newMatch(opts.Mode, opts.Ships, opts.Duration*60, g.factions)
+	if err != nil {
+		return nil, err
+	}
+	g.enterCredits() // the autonomous arena; a real match replaces the horde's drip with its fleets
+	if g.match.Mode != MatchEndless {
+		g.dealFleets()
+	}
 	g.floodView = false
 	g.debugHUD = opts.Debug
 	return g, nil
@@ -250,6 +265,13 @@ func (g *Game) arenaFitsView() bool {
 // no Konami code, no Esc/R — the window is click-through, so there is no player
 // to press them.
 func (g *Game) stepSkirmishMeta() {
+	// A real match owns its arena for its whole length: no regeneration mid
+	// battle. The periodic regen is the AQUARIUM's — attract-screen heritage,
+	// kept only where nothing ever ends.
+	if g.match != nil && g.match.Mode != MatchEndless {
+		g.stepMatchMeta()
+		return
+	}
 	g.creditsRegenCD--
 	if g.creditsRegenCD <= 0 || !g.arenaFitsView() {
 		g.buildCreditsArena() // a fresh field to keep flying and fighting in

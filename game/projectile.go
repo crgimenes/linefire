@@ -251,7 +251,10 @@ func (g *Game) stepEnemyShots() {
 		// faction in its path. The campaign's horde is all faction 0, so its
 		// own fire keeps passing through its own kind, exactly as before.
 		if hit := g.bulletHitsFoe(p.px, p.py, nx, ny, p.faction); hit >= 0 {
-			g.damageEnemy(hit, shipShotHullDamage, p.rglow, p.sid)
+			victim := g.entities[hit].faction
+			if g.damageEnemy(hit, shipShotHullDamage, p.rglow, p.sid) {
+				g.match.recordKill(p.faction, victim)
+			}
 			q := p
 			q.dmg = shipShotHullDamage // sparks scale with the hull damage dealt, not the player-unit payload
 			g.impactBurst(nx, ny, &q, true)

@@ -200,6 +200,7 @@ type Game struct {
 	filoEng    *filo.Engine       // skirmish: the shared Filo engine (see pilot.go)
 	factionAIs map[int]*factionAI // skirmish: compiled program per faction (absent = house brain)
 	ipcDrivers map[int]*IPCDriver // skirmish: external pilot per faction (see ipc.go)
+	match      *Match             // skirmish: the battle being fought (see match.go); nil in the campaign
 
 	simRand   *rand.Rand   // headless battle: the seeded simulation dice (nil = the globals)
 	simTick   int          // headless battle: the runner's own clock (ebiten's never ticks without a window)
@@ -578,6 +579,35 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return g.sw, g.sh
 }
 
+// updateGameOver runs the dead screen: C rolls the credits, R restarts (from
+// the checkpoint, or from scratch with Shift), and left idle it returns to the
+// attract demo on its own — an arcade cabinet never sits dead.
+func (g *Game) updateGameOver() error {
+	g.sfx.stopLoops()
+	g.sfx.stopMusic() // silence reads as defeat
+	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+		g.enterCreditsReturning() // roll the credits; Esc will come back to this game-over screen
+		return nil
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) || touchJustTapped() {
+		if g.checkpoint.valid && !shiftHeld() {
+			g.restoreCheckpoint() // R (or a tap): back to the last checkpoint with the run intact
+		} else {
+			mapDir, mapName, simple := g.mapDir, g.mapName, g.simpleMap
+			sfx := g.sfx // the audio context is a process singleton: carry it over
+			g.releaseTransientImages()
+			*g = *newWithContent(g.content, g.player, g.level, mapDir, simple)
+			g.mapName, g.sfx = mapName, sfx // Shift+R (or no checkpoint): from scratch
+		}
+		return nil
+	}
+	g.overIdle++
+	if g.overIdle >= attractIdleFrames {
+		g.enterTitle()
+	}
+	return nil
+}
+
 // Update steps input, physics and collision once.
 // updateHotkeys handles the global toggle keys (render modes, overlays, window).
 func (g *Game) updateHotkeys() {
@@ -667,31 +697,7 @@ func (g *Game) Update() error {
 
 	// When the player is dead, only the restart key is live.
 	if g.over {
-		g.sfx.stopLoops()
-		g.sfx.stopMusic() // silence reads as defeat
-		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
-			g.enterCreditsReturning() // roll the credits; Esc will come back to this game-over screen
-			return nil
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyR) || touchJustTapped() {
-			if g.checkpoint.valid && !shiftHeld() {
-				g.restoreCheckpoint() // R (or a tap): back to the last checkpoint with the run intact
-			} else {
-				mapDir, mapName, simple := g.mapDir, g.mapName, g.simpleMap
-				sfx := g.sfx // the audio context is a process singleton: carry it over
-				g.releaseTransientImages()
-				*g = *newWithContent(g.content, g.player, g.level, mapDir, simple)
-				g.mapName, g.sfx = mapName, sfx // Shift+R (or no checkpoint): from scratch
-			}
-			return nil
-		}
-		// Left idle, the game-over screen returns to attract on its own — an arcade cabinet never
-		// sits dead, it loops back to the demo to draw the next player in.
-		g.overIdle++
-		if g.overIdle >= attractIdleFrames {
-			g.enterTitle()
-		}
-		return nil
+		return g.updateGameOver()
 	}
 
 	// Campaign won: the victory screen is terminal and owns input.
@@ -760,7 +766,11 @@ func (g *Game) Update() error {
 		return nil
 	}
 	g.updateDiscovery()
-	g.stepHorde()
+	// The horde reinforces the campaign and the endless aquarium; a real match
+	// is fought with the fleets that landed — no reinforcements.
+	if g.match == nil || g.match.Mode == MatchEndless {
+		g.stepHorde()
+	}
 	g.energyPool().Tick() // the slow trickle back; a pickup is what refills it properly
 	g.stepArrivals()      // vortices land the ships they were opened for (skirmish)
 	g.stepProjectiles()

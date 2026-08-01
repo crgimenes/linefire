@@ -111,6 +111,7 @@ func (g *Game) buildCreditsArena() {
 	skirmishMap := g.skirmishMap
 	filoEng, factionAIs := g.filoEng, g.factionAIs // the programs survive; ships re-instantiate on arrival
 	ipcDrivers := g.ipcDrivers                     // the external drivers survive the regen too
+	match := g.match                               // the scoreboard survives (endless accumulates across regens)
 	// The screen size belongs to the WINDOW, not to the world, so it has to survive
 	// a world rebuild. Linefire gets away with losing it because Layout runs again
 	// before the next Update; an arena sized FROM it does not, and would spend a
@@ -171,6 +172,7 @@ func (g *Game) buildCreditsArena() {
 	g.skirmishMap = skirmishMap
 	g.filoEng, g.factionAIs = filoEng, factionAIs
 	g.ipcDrivers = ipcDrivers
+	g.match = match
 	g.sw, g.sh, g.dpr, g.winW, g.winH = sw, sh, dpr, winW, winH
 	if transparent {
 		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry
