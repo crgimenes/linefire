@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"image/color"
+	"io"
 	"io/fs"
 	"math"
 	"math/rand/v2"
@@ -156,6 +157,11 @@ type SkirmishOptions struct {
 	// builds each with NewIPCDriver; the protocol is ipc.go's doc. A faction
 	// cannot have both a Program and a driver.
 	IPC []*IPCDriver
+
+	// Events is the control plane's outbound stream (JSONL: spawns, shots,
+	// hits, deaths, battles staged and decided — see control.go and trace.go);
+	// nil keeps the game silent. Commands come back via PostCommand.
+	Events io.Writer
 }
 
 // NewSkirmish builds the faction battle for a transparent desktop window: an
@@ -222,10 +228,11 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 	if err != nil {
 		return nil, err
 	}
+	g.trace = newBattleTrace(opts.Events)
+	g.ctrl = &controlInbox{}
 	g.enterCredits() // the autonomous arena; a real match replaces the horde's drip with its fleets
-	if g.match.Mode != MatchEndless {
-		g.dealFleets()
-	}
+	g.dealFleets()
+	g.emitBattleEvent()
 	g.floodView = false
 	g.debugHUD = opts.Debug
 	return g, nil
@@ -265,6 +272,7 @@ func (g *Game) arenaFitsView() bool {
 // no Konami code, no Esc/R — the window is click-through, so there is no player
 // to press them.
 func (g *Game) stepSkirmishMeta() {
+	g.consumeCommand() // the control plane speaks between ticks, on this goroutine
 	// A real match owns its arena for its whole length: no regeneration mid
 	// battle. The periodic regen is the AQUARIUM's — attract-screen heritage,
 	// kept only where nothing ever ends.

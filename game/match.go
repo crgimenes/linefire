@@ -193,12 +193,24 @@ func (g *Game) presentFactions() (present, lastAlive int) {
 	return len(seen), lastAlive
 }
 
+// matchRefitGraceTicks is how long into a battle a wrong-sized arena still
+// restages it: the view's real size arrives only after the first Layout, so
+// the boot battle would otherwise be fought on the pre-Layout default field.
+const matchRefitGraceTicks = 120
+
 // stepMatchMeta is the skirmish meta-loop for REAL matches (the endless
 // aquarium keeps stepSkirmishMeta's regeneration): tick the match, and when it
 // is decided let the survivors fly their lap, then stage the next battle on a
 // fresh field.
 func (g *Game) stepMatchMeta() {
 	m := g.match
+	// A match owns its arena, so a mid-battle window resize waits for the next
+	// one — but a misfit in the opening moments is the boot case (see the
+	// grace constant) and restages on a right-sized field.
+	if !m.over && m.tick < matchRefitGraceTicks && !g.arenaFitsView() {
+		g.startMatch()
+		return
+	}
 	if m.over {
 		m.cooldown--
 		if m.cooldown <= 0 {
@@ -212,6 +224,7 @@ func (g *Game) stepMatchMeta() {
 	if over {
 		m.cooldown = matchCooldownTicks
 		log.Print("battle over: " + m.result())
+		g.emitResultEvent()
 	}
 }
 
@@ -225,14 +238,16 @@ func (g *Game) startMatch() {
 	}
 	g.match = m
 	g.dealFleets()
+	g.emitBattleEvent()
 }
 
-// dealFleets opens each faction's vortices for a real match. The horde stays
-// for its asset cache but never reinforces a battle — the fleets that land
-// are the fleets there are.
+// dealFleets opens each faction's vortices for a real match; the endless
+// aquarium is fed by the horde instead. The horde object stays either way for
+// its asset cache, but never reinforces a battle — the fleets that land are
+// the fleets there are.
 func (g *Game) dealFleets() {
-	if g.horde == nil {
-		return // bare test worlds have no spawner to deal with
+	if g.match.Mode == MatchEndless || g.horde == nil {
+		return // the aquarium drips; bare test worlds have no spawner to deal with
 	}
 	for i := 0; i < g.match.Ships*g.factions; i++ {
 		g.spawnArrival(battleKinds[i%len(battleKinds)], g.horde.rng)

@@ -205,7 +205,9 @@ type Game struct {
 	simRand   *rand.Rand   // headless battle: the seeded simulation dice (nil = the globals)
 	simTick   int          // headless battle: the runner's own clock (ebiten's never ticks without a window)
 	entitySeq int          // last ship id dealt; ids are stable for the trace
-	trace     *battleTrace // headless battle: the JSONL event writer (nil = silent)
+	trace     *battleTrace // battle events as JSONL (headless trace, or the visual control plane); nil = silent
+	ctrl      *controlInbox // skirmish: the control plane's command mailbox (see control.go)
+	arenaSeed int64        // the seed the current arena was generated from
 
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
 	creditsPlayable bool                          // the Konami code handed control to the player

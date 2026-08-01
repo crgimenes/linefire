@@ -112,6 +112,7 @@ func (g *Game) buildCreditsArena() {
 	filoEng, factionAIs := g.filoEng, g.factionAIs // the programs survive; ships re-instantiate on arrival
 	ipcDrivers := g.ipcDrivers                     // the external drivers survive the regen too
 	match := g.match                               // the scoreboard survives (endless accumulates across regens)
+	trace, ctrl := g.trace, g.ctrl                 // the control plane survives: its stream and its mailbox
 	// The screen size belongs to the WINDOW, not to the world, so it has to survive
 	// a world rebuild. Linefire gets away with losing it because Layout runs again
 	// before the next Update; an arena sized FROM it does not, and would spend a
@@ -123,7 +124,7 @@ func (g *Game) buildCreditsArena() {
 	// empty-target exit portal is inert while the demo runs, so it is just decoration. The arena
 	// declares NO music — the attract soundtrack is driven separately (updateCreditsMusic) so a
 	// full random track plays to its end regardless of when the backdrop swaps.
-	seed := int64(randIntN(1 << 30)) // #nosec G115 -- a display seed, not crypto
+	seed := int64(randIntN(1 << 30)) // #nosec G115 -- a display seed, not crypto (recorded in arenaSeed below)
 	// The credits demo fights in a cave; skirmish fights in its chosen arena:
 	// the open field by default, or the cave generator fitted to the screen as
 	// the maze. A transparent screen has no fills, so the maze's walls are
@@ -173,6 +174,8 @@ func (g *Game) buildCreditsArena() {
 	g.filoEng, g.factionAIs = filoEng, factionAIs
 	g.ipcDrivers = ipcDrivers
 	g.match = match
+	g.trace, g.ctrl = trace, ctrl
+	g.arenaSeed = seed
 	g.sw, g.sh, g.dpr, g.winW, g.winH = sw, sh, dpr, winW, winH
 	if transparent {
 		g.floodView = false // the flood look is built out of fills, which an alpha screen cannot carry
