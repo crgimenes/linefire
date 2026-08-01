@@ -106,7 +106,7 @@ func TestDamageEnemyFlashesThenExplodes(t *testing.T) {
 	g := &Game{}
 	g.entities = []entity{{kind: kindEnemy, x: 40, y: 40, radius: 5, hp: 2}}
 
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	if g.enemiesLeft() != 1 || g.entities[0].hitFlash <= 0 {
 		t.Fatalf("first hit should flash and survive: left=%d flash=%d", g.enemiesLeft(), g.entities[0].hitFlash)
 	}
@@ -114,7 +114,7 @@ func TestDamageEnemyFlashesThenExplodes(t *testing.T) {
 		t.Fatal("no explosion before the enemy dies")
 	}
 
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	if g.enemiesLeft() != 0 {
 		t.Fatalf("second hit should destroy the enemy, %d left", g.enemiesLeft())
 	}

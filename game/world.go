@@ -30,6 +30,7 @@ type entity struct {
 	kind       entityKind
 	align      alignment // map-marker classification (good/bad/ally/neutral)
 	faction    int       // team: 0 is the campaign's horde (it preys on the player); skirmish ships are 1..N and prey on each other
+	id         int       // stable ship id (enemyEntity deals them); 0 for anything else
 	x, y       float64
 	angle      float64
 	radius     float64
@@ -573,8 +574,8 @@ func (g *Game) patrol(e *entity) {
 	if e.wanderCD > 0 {
 		e.wanderCD--
 	} else {
-		e.wanderHead += (randFloat()*2 - 1) * patrolTurnRange
-		e.wanderCD = patrolHold + randIntN(patrolHold)
+		e.wanderHead += (g.simFloat()*2 - 1) * patrolTurnRange
+		e.wanderCD = patrolHold + g.simIntN(patrolHold)
 	}
 
 	dx, dy := math.Cos(e.wanderHead), math.Sin(e.wanderHead)
@@ -582,7 +583,7 @@ func (g *Game) patrol(e *entity) {
 	g.applyEnemyMove(e, dx, dy, patrolSpeed)
 	if e.x == bx && e.y == by {
 		// Blocked: turn 90-180 degrees and commit to the new heading.
-		e.wanderHead += math.Pi/2 + randFloat()*math.Pi/2
+		e.wanderHead += math.Pi/2 + g.simFloat()*math.Pi/2
 		e.wanderCD = patrolHold
 		e.vx, e.vy = 0, 0
 		return
@@ -616,8 +617,10 @@ func (g *Game) enemyFire(e *entity, tx, ty float64) {
 		life:    enemyBulletLife,
 		dmg:     e.shotDmg,
 		faction: e.faction,
+		sid:     e.id,
 		rcol:    rcol, rglow: rglow, width: bulletWidth, glowW: bulletGlowWidth,
 	})
+	g.traceShot(e, tx, ty)
 	// The enemy's own fire sound, when its asset declares one ("fire" has no
 	// fallback on purpose: a full room of default pew-pew would swamp the mix).
 	g.playEvent(e.a, "fire")
@@ -635,7 +638,7 @@ func (e *entity) detectRange() float64 {
 // damageEnemy applies dmg to the enemy at index i, destroying it and scoring when
 // its health runs out, and pops a floating damage number colored by its source. A
 // surviving enemy widens its radar so it retaliates against fire from beyond range.
-func (g *Game) damageEnemy(i, dmg int, col color.RGBA) {
+func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) {
 	e := &g.entities[i]
 	if e.boss && g.escortsAlive() {
 		// The boss is shielded until the room is cleared: fire glances off, no damage taken. The
@@ -647,10 +650,12 @@ func (g *Game) damageEnemy(i, dmg int, col color.RGBA) {
 	e.hp -= dmg
 	g.spawnDamageNumber(e.x, e.y-e.radius, dmg, col)
 	if e.hp > 0 {
+		g.traceHit(e, by, dmg)
 		e.hitFlash = hitFlashFrames
 		e.radar = math.Min(e.detectRange()*radarHitBoost, radarRange*radarMaxMul)
 		return
 	}
+	g.traceDeath(e, by)
 	x, y := e.x, e.y
 	kind := ""
 	if e.a != nil {
@@ -741,7 +746,7 @@ func (g *Game) resolveContacts() {
 		if dx*dx+dy*dy > rr*rr {
 			continue
 		}
-		g.damageEnemy(i, ramEnemyDamage, damageColor)
+		g.damageEnemy(i, ramEnemyDamage, damageColor, 0)
 		g.hurtPlayer(contactDamage)
 		if g.invuln < contactInvuln {
 			g.invuln = contactInvuln

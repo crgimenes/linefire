@@ -274,11 +274,21 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	mem["fire-ready"] = filo.VBool(e.fireCD <= 0)
 	mem["field-w"] = filo.VNum(g.bounds.w())
 	mem["field-h"] = filo.VNum(g.bounds.h())
-	mem["tick"] = filo.VNum(float64(ebiten.Tick()))
+	mem["tick"] = filo.VNum(float64(g.currentTick()))
 
 	allies, enemies := g.sensorContacts(e)
 	mem["allies"] = filo.VList(allies)
 	mem["enemies"] = filo.VList(enemies)
+}
+
+// currentTick is the simulation clock: the headless runner's own counter when
+// one is running (ebiten's never advances without a window), the display's
+// otherwise.
+func (g *Game) currentTick() int {
+	if g.simTick > 0 {
+		return g.simTick
+	}
+	return int(ebiten.Tick())
 }
 
 // kindName is the ship's archetype name, empty-safe for asset-less markers.

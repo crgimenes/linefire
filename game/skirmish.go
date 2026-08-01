@@ -307,10 +307,11 @@ func (g *Game) stepArrivals() {
 			continue
 		}
 		ha := g.factionSkin(a.kind, a.faction)
-		e := enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0)
+		e := g.enemyEntity(a.kind, ha.a, ha.mesh, ha.glow, a.x, a.y, 0)
 		e.faction = a.faction
 		e.pilot = g.pilotFor(a.faction) // a new ship is a new mind: fresh memory
 		g.entities = append(g.entities, e)
+		g.traceSpawn(&g.entities[len(g.entities)-1])
 	}
 	g.arrivals = kept
 }

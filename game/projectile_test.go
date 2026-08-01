@@ -79,11 +79,11 @@ func TestBulletHitsAndDestroysEnemy(t *testing.T) {
 func TestEnemySurvivesUntilHealthGone(t *testing.T) {
 	g := &Game{}
 	g.entities = []entity{{kind: kindEnemy, x: 5, y: 0, radius: 2, hp: 2}}
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	if g.enemiesLeft() != 1 || g.score != 0 {
 		t.Fatalf("enemy should survive first hit: left=%d score=%d", g.enemiesLeft(), g.score)
 	}
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	if g.enemiesLeft() != 0 || g.score != 1 {
 		t.Fatalf("enemy should die on second hit: left=%d score=%d", g.enemiesLeft(), g.score)
 	}

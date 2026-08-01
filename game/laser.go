@@ -123,7 +123,7 @@ func (g *Game) fireLaserTick(w *weapon.Weapon) bool {
 		}
 		e := &g.entities[i]
 		if distPointSegmentSq(e.x, e.y, g.x, g.y, g.laserX1, g.laserY1) <= e.radius*e.radius {
-			g.damageEnemy(i, damageForLevel(w.Damage, g.damageLevel), w.Col)
+			g.damageEnemy(i, damageForLevel(w.Damage, g.damageLevel), w.Col, 0)
 		}
 	}
 	return true

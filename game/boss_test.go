@@ -21,12 +21,12 @@ func TestBossIsShieldedUntilEscortsCleared(t *testing.T) {
 		t.Fatal("an escort is alive, so escortsAlive should be true")
 	}
 
-	g.damageEnemy(0, 3, damageColor) // fire at the boss while the escort lives
+	g.damageEnemy(0, 3, damageColor, 0) // fire at the boss while the escort lives
 	if g.entities[0].hp != 5 {
 		t.Fatalf("the shielded boss should take no damage, got hp %d", g.entities[0].hp)
 	}
 
-	g.damageEnemy(1, 3, damageColor) // kill the escort (hp 3, dmg 3)
+	g.damageEnemy(1, 3, damageColor, 0) // kill the escort (hp 3, dmg 3)
 	if g.escortsAlive() {
 		t.Fatal("the only escort is dead — escortsAlive should be false")
 	}
@@ -34,7 +34,7 @@ func TestBossIsShieldedUntilEscortsCleared(t *testing.T) {
 		t.Fatalf("only the boss should remain, got %d entities", len(g.entities))
 	}
 
-	g.damageEnemy(0, 3, damageColor) // now the boss is exposed
+	g.damageEnemy(0, 3, damageColor, 0) // now the boss is exposed
 	if g.entities[0].hp != 2 {
 		t.Fatalf("the exposed boss should take damage, got hp %d", g.entities[0].hp)
 	}

@@ -31,7 +31,7 @@ func TestClearedResolutionSpawnsRewardOnce(t *testing.T) {
 		t.Fatalf("expected just the enemy, got %d entities", len(g.entities))
 	}
 
-	g.damageEnemy(0, 999, damageColor) // kill it: the map is now cleared
+	g.damageEnemy(0, 999, damageColor, 0) // kill it: the map is now cleared
 
 	if g.updateResolutions() {
 		t.Fatal("a spawn routine must not report a world swap")
@@ -84,7 +84,7 @@ func TestReturnWithoutOriginStaysPut(t *testing.T) {
 		{On: level.OnCleared, Do: level.DoReturn},
 	})
 	g := New(asset.New(), lvl, "", false)
-	g.damageEnemy(0, 999, damageColor)
+	g.damageEnemy(0, 999, damageColor, 0)
 	if g.updateResolutions() {
 		t.Fatal("return with no cameFrom must not swap the world")
 	}
@@ -100,7 +100,7 @@ func TestExitToSameMapTeleportsInPlace(t *testing.T) {
 	lvl.Entries = []level.Entry{{Name: "door", X: 300, Y: 320, Angle: 0}}
 	g := New(asset.New(), lvl, "", false)
 	g.mapName = "arena" // the exit targets this same map: teleport, no reload
-	g.damageEnemy(0, 999, damageColor)
+	g.damageEnemy(0, 999, damageColor, 0)
 
 	if g.updateResolutions() {
 		t.Fatal("a same-map exit teleports; it must not report a swap")

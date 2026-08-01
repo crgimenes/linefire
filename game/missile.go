@@ -60,6 +60,6 @@ func (g *Game) explodeAt(x, y float64, dmg int, radius float64, col color.RGBA) 
 		if hit < 1 {
 			hit = 1
 		}
-		g.damageEnemy(i, hit, col)
+		g.damageEnemy(i, hit, col, 0)
 	}
 }

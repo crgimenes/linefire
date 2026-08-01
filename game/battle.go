@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"math/rand/v2"
 
@@ -18,16 +19,20 @@ import (
 // eyeballed over one. The graphical skirmish and this runner step the same
 // code: updateEnemies, the Filo pilots, the shots, the damage.
 //
-// Placement is deterministic for a given Seed; each hull's temperament
-// (standoff spread, orbit direction) still draws from the game's own dice, so
-// two runs of the same seed are close but not identical.
+// A battle is DETERMINISTIC: placement, per-hull temperament and every patrol
+// turn draw from the seed's own dice (simRand), so the same options replay the
+// same fight byte for byte — a trace is a reproducible artifact, a regression
+// can be bisected by seed, and a player-vs-player dispute has a verifiable
+// record.
 type BattleOptions struct {
-	Programs []string // one Filo source per faction, Programs[0] = faction 1 (empty = house brain)
-	Factions int      // teams, clamped to 2..maxFactions (0 = 2)
-	Ships    int      // hulls per faction (0 = 8)
-	Map      string   // SkirmishMapArena (default) or SkirmishMapMaze
-	Seed     int64    // arena generation and placement seed
-	MaxTicks int      // battle length cap in ticks (0 = 7200: two minutes of game time)
+	Programs []string  // one Filo source per faction, Programs[0] = faction 1 (empty = house brain)
+	Factions int       // teams, clamped to 2..maxFactions (0 = 2)
+	Ships    int       // hulls per faction (0 = 8)
+	Map      string    // SkirmishMapArena (default) or SkirmishMapMaze
+	Seed     int64     // arena generation and placement seed
+	MaxTicks int       // battle length cap in ticks (0 = 7200: two minutes of game time)
+	Trace    io.Writer // battle trace destination (JSONL; see trace.go) — nil = no trace
+	Battle   int       // battle number stamped on the trace header, for multi-battle files
 }
 
 // BattleResult is how one fight ended.
@@ -77,6 +82,9 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	g.skirmishMode = true
 	g.arenaCam = true
 	g.factions = min(max(opts.Factions, 2), maxFactions)
+	// #nosec G404 -- deterministic battle simulation, not a security boundary
+	g.simRand = rand.New(rand.NewPCG(uint64(opts.Seed), 0x53494d)) // stream = "SIM"
+	g.trace = newBattleTrace(opts.Trace)
 	if len(opts.Programs) > 0 {
 		g.filoEng = newPilotEngine()
 		g.factionAIs, err = compilePilots(g.filoEng, opts.Programs)
@@ -87,6 +95,12 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	// The horde is built for its asset cache only — it is never stepped, so a
 	// battle has no reinforcements: the fleets that land are the fleets there are.
 	g.horde = newHorde(level.Horde{Types: battleKinds, Seed: opts.Seed})
+
+	g.trace.emit(map[string]any{
+		"ev": "battle", "n": opts.Battle, "seed": opts.Seed,
+		"map": lvl.Title, "w": int(lvl.Size.W), "h": int(lvl.Size.H),
+		"factions": g.factions, "ships": ships,
+	})
 
 	// Land the fleets through the same vortex machinery the screen uses (which
 	// deals the factions round-robin and keeps arrivals off walls and off each
@@ -100,14 +114,25 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 		g.stepArrivals()
 	}
 
+	last := map[int][2]float64{} // per-ship position at the previous snapshot
+	res := BattleResult{Winner: 0, Ticks: maxTicks}
 	for tick := 1; tick <= maxTicks; tick++ {
+		g.simTick = tick
 		g.updateEnemies()
 		g.stepEnemyShots()
+		if tick%snapEvery == 0 {
+			g.traceSnapshot(last)
+		}
 		if winner, over := g.battleOver(); over {
-			return BattleResult{Winner: winner, Ticks: tick, Alive: g.aliveByFaction()}, nil
+			res = BattleResult{Winner: winner, Ticks: tick}
+			break
 		}
 	}
-	return BattleResult{Winner: 0, Ticks: maxTicks, Alive: g.aliveByFaction()}, nil
+	res.Alive = g.aliveByFaction()
+	g.trace.emit(map[string]any{
+		"ev": "result", "winner": res.Winner, "ticks": res.Ticks, "alive": res.Alive,
+	})
+	return res, nil
 }
 
 // aliveByFaction counts the live hulls per team.

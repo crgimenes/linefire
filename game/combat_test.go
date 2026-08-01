@@ -180,13 +180,13 @@ func TestEnemyRadarExpandsWhenHitAndCaps(t *testing.T) {
 	g := &Game{}
 	g.entities = []entity{{kind: kindEnemy, hp: 99, radar: radarRange}}
 
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	if g.entities[0].radar <= radarRange {
 		t.Fatalf("radar should grow after a hit, got %v", g.entities[0].radar)
 	}
 
 	for range 6 {
-		g.damageEnemy(0, playerShotDamage, damageColor) // keeps surviving (hp 99)
+		g.damageEnemy(0, playerShotDamage, damageColor, 0) // keeps surviving (hp 99)
 	}
 	if g.entities[0].radar > radarRange*radarMaxMul+1e-9 {
 		t.Fatalf("radar exceeded the cap: %v > %v", g.entities[0].radar, radarRange*radarMaxMul)
@@ -206,7 +206,7 @@ func TestHitEnemyRetaliatesFromBeyondBaseRadar(t *testing.T) {
 	}
 
 	// Hit it: radar widens to include the player, so next update it fires back.
-	g.damageEnemy(0, playerShotDamage, damageColor)
+	g.damageEnemy(0, playerShotDamage, damageColor, 0)
 	g.updateEnemies()
 	if len(g.enemyShots) == 0 {
 		t.Fatal("a hit enemy should retaliate against a player just beyond base radar")

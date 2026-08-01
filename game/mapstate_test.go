@@ -88,7 +88,7 @@ func killAllEnemies(g *Game) {
 		if idx < 0 {
 			return
 		}
-		g.damageEnemy(idx, playerShotDamage, damageColor)
+		g.damageEnemy(idx, playerShotDamage, damageColor, 0)
 	}
 }
 

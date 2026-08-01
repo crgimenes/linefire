@@ -200,6 +200,11 @@ type Game struct {
 	filoEng    *filo.Engine       // skirmish: the shared Filo engine (see pilot.go)
 	factionAIs map[int]*factionAI // skirmish: compiled program per faction (absent = house brain)
 
+	simRand   *rand.Rand   // headless battle: the seeded simulation dice (nil = the globals)
+	simTick   int          // headless battle: the runner's own clock (ebiten's never ticks without a window)
+	entitySeq int          // last ship id dealt; ids are stable for the trace
+	trace     *battleTrace // headless battle: the JSONL event writer (nil = silent)
+
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
 	creditsPlayable bool                          // the Konami code handed control to the player
 	creditsScroll   float64                       // credits vertical scroll offset (logical px)

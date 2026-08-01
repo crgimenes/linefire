@@ -129,7 +129,7 @@ func (g *Game) spawnHordeEnemy() bool {
 			continue
 		}
 		ha := g.hordeAssetFor(kind)
-		g.entities = append(g.entities, enemyEntity(kind, ha.a, ha.mesh, ha.glow, x, y, 0))
+		g.entities = append(g.entities, g.enemyEntity(kind, ha.a, ha.mesh, ha.glow, x, y, 0))
 		return true
 	}
 	return false
@@ -192,23 +192,27 @@ func (g *Game) hordeAssetFor(kind string) hordeAsset {
 	return ha
 }
 
-// enemyEntity builds a live enemy from its archetype at a world position. Shared by
-// buildEntities and the horde spawner so both make identical enemies. spawn is -1:
-// a spawner enemy is not a level spawn, so it is not tracked for per-map
-// persistence.
-func enemyEntity(kind string, a *asset.Asset, mesh, glow *render.Mesh, x, y, angle float64) entity {
+// enemyEntity builds a live enemy from its archetype at a world position,
+// dealing it the next stable id. Shared by the horde spawner and the arrival
+// vortices so both make identical enemies. The per-hull temperament (orbit
+// direction, standoff spread) draws from the SIMULATION dice, so a seeded
+// headless battle replays exactly. spawn is -1: a spawner enemy is not a level
+// spawn, so it is not tracked for per-map persistence.
+func (g *Game) enemyEntity(kind string, a *asset.Asset, mesh, glow *render.Mesh, x, y, angle float64) entity {
 	arch := archetypeFor(kind)
 	orbit := 1.0
-	if randFloat() < 0.5 {
+	if g.simFloat() < 0.5 {
 		orbit = -1.0
 	}
+	g.entitySeq++
 	return entity{
 		kind: kindEnemy, align: alignBad, x: x, y: y, angle: angle,
+		id: g.entitySeq,
 		hp: arch.HP, radar: arch.Radar,
 		stationary: arch.Stationary, fireEvery: arch.FireEvery,
 		shotDmg: arch.ShotDamage, shotSpeed: arch.ShotSpeed, speedMul: arch.SpeedMul,
 		a: a, mesh: mesh, glowMesh: glow, radius: assetRadius(a),
-		standoff:   arch.Standoff * (0.8 + randFloat()*0.5),
+		standoff:   arch.Standoff * (0.8 + g.simFloat()*0.5),
 		wanderHead: angle * math.Pi / 180,
 		orbitDir:   orbit,
 		spawn:      -1,

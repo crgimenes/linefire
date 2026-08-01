@@ -81,6 +81,7 @@ type projectile struct {
 	aoe     float64    // explosion radius in world units; 0 = direct-hit only
 	seek    float64    // homing turn rate, radians/frame (0 = flies straight)
 	faction int        // the shooter's team (enemy shots): its own kind is never hit
+	sid     int        // the shooter's ship id (enemy shots), for the battle trace
 
 	rcol  color.RGBA // core render color (per-weapon, so one pool draws every shot)
 	rglow color.RGBA // glow render color
@@ -176,7 +177,7 @@ func (g *Game) stepPlayerShots(shots []projectile) []projectile {
 			if p.aoe > 0 {
 				g.explodeAt(nx, ny, p.dmg, p.aoe, p.col)
 			} else {
-				g.damageEnemy(hit, p.dmg, p.col)
+				g.damageEnemy(hit, p.dmg, p.col, 0)
 				g.impactBurst(nx, ny, &p, true) // connected: sparks + a small punch
 			}
 			continue
@@ -250,7 +251,7 @@ func (g *Game) stepEnemyShots() {
 		// faction in its path. The campaign's horde is all faction 0, so its
 		// own fire keeps passing through its own kind, exactly as before.
 		if hit := g.bulletHitsFoe(p.px, p.py, nx, ny, p.faction); hit >= 0 {
-			g.damageEnemy(hit, shipShotHullDamage, p.rglow)
+			g.damageEnemy(hit, shipShotHullDamage, p.rglow, p.sid)
 			q := p
 			q.dmg = shipShotHullDamage // sparks scale with the hull damage dealt, not the player-unit payload
 			g.impactBurst(nx, ny, &q, true)
