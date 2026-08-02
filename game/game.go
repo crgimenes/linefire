@@ -1067,6 +1067,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.drawRoundMask(screen)
 	}
 
+	g.drawVerdict(screen) // skirmish: a decided battle says so, and then stays decided
 	g.drawHUD(screen)
 	g.drawTouchSticks(screen) // live thumbs + pause spot; invisible until a finger has landed
 

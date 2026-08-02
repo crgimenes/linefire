@@ -226,3 +226,43 @@ func TestEachArenaDealsItsFleetsSomewhereNew(t *testing.T) {
 		t.Fatalf("both arenas dealt every ship to the identical spot: %v", first)
 	}
 }
+
+// A won battle stays won. It used to count down and deal itself a fresh one,
+// which is why a match watched to the end looked like it restarted — crg saw
+// the winner flash past with a new field already landing. The verdict now
+// holds until somebody asks for another battle.
+func TestAWonBattleStaysWon(t *testing.T) {
+	g, err := NewSkirmish(filoio.OSFS(), "../gameassets", SkirmishOptions{
+		Mode: MatchLastFleet, Ships: 2, Factions: 2,
+	})
+	if err != nil {
+		t.Fatalf("NewSkirmish: %v", err)
+	}
+	g.match.staged = true
+	g.match.winner, g.match.over = 3, true
+	before := g.arenaSeed
+
+	for range 60 * 30 { // half a minute of a decided battle
+		g.stepMatchMeta()
+	}
+
+	winner, over := g.match.Over()
+	if !over || winner != 3 {
+		t.Fatalf("the verdict changed on its own: winner=%d over=%v", winner, over)
+	}
+	if g.arenaSeed != before {
+		t.Error("a new arena was generated: the battle restarted itself")
+	}
+}
+
+// The endless aquarium has no end to reach, so nothing above can freeze it.
+func TestTheAquariumIsNeverOver(t *testing.T) {
+	m, err := newMatch(MatchEndless, 4, 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.step(1, 1) // one faction left would decide any real mode
+	if _, over := m.Over(); over {
+		t.Error("the endless mode declared a winner; it has no end condition")
+	}
+}

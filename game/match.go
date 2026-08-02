@@ -31,10 +31,6 @@ const (
 	MatchTimed     = "timed"
 )
 
-// matchCooldownTicks is how long a finished battle stays on screen — the
-// survivors flying their victory lap — before the next one begins.
-const matchCooldownTicks = 300 // 5s
-
 // FleetStats is one faction's scoreboard.
 type FleetStats struct {
 	Kills    int // enemy ships destroyed
@@ -50,11 +46,10 @@ type Match struct {
 	Duration int // deadline in ticks (timed)
 	Factions int // teams dealt in: one is solo practice, with nobody to annihilate
 
-	tick     int
-	over     bool
-	winner   int // faction that prevailed; 0 = draw (or not over yet)
-	cooldown int
-	Stats    map[int]*FleetStats
+	tick   int
+	over   bool
+	winner int // faction that prevailed; 0 = draw (or not over yet)
+	Stats  map[int]*FleetStats
 
 	// A battle is staged once the view has stopped changing size: a window
 	// settles into its real dimensions over the first frames (the requested
@@ -219,8 +214,8 @@ func (g *Game) presentFactions() (present, lastAlive int) {
 
 // stepMatchMeta is the skirmish meta-loop for REAL matches (the endless
 // aquarium keeps stepSkirmishMeta's regeneration): tick the match, and when it
-// is decided let the survivors fly their lap, then stage the next battle on a
-// fresh field. A match owns its arena for its whole length, so a window
+// is decided, stop — the verdict stands on screen until somebody asks for
+// another battle. A match owns its arena for its whole length, so a window
 // resized mid-battle is honoured by the NEXT battle.
 func (g *Game) stepMatchMeta() {
 	m := g.match
@@ -229,17 +224,20 @@ func (g *Game) stepMatchMeta() {
 		return
 	}
 	if m.over {
-		m.cooldown--
-		if m.cooldown <= 0 {
-			g.startMatch()
-		}
+		// A won battle STAYS won. This used to count down and deal a fresh one
+		// by itself, which is why a match watched to the end looked like it
+		// restarted: the winner flashed past and a new field was already
+		// landing. A result is a result — it holds until somebody asks for
+		// another battle (the garage's Restage, or a new Deploy). Best-of-N, if
+		// it ever exists, is a rule about a SERIES and belongs above this.
+		//
+		// The endless aquarium never gets here: it has no end to reach.
 		return
 	}
 	present, last := g.presentFactions()
 	m.step(present, last)
 	_, over := m.Over()
 	if over {
-		m.cooldown = matchCooldownTicks
 		log.Print("battle over: " + m.result())
 		g.emitResultEvent()
 	}

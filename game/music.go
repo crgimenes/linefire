@@ -219,6 +219,12 @@ func (g *Game) desiredMusic() (string, int64, bool) {
 // next random track — crossing themeless screens just chains random songs until a
 // themed one takes over.
 func (g *Game) updateMusic() {
+	// Skirmish has NO soundtrack (crg). The songs belong to Linefire's arcade
+	// cabinet, not to a battle sitting on somebody's desktop while they work.
+	// What sound buys here is the fighting itself: shots, hits, blasts.
+	if g.skirmishMode {
+		return
+	}
 	// The attract demo runs the jukebox directly: full, non-looping random tracks —
 	// never the combat themes (it is always fighting, which would drown them).
 	if g.creditsMode {

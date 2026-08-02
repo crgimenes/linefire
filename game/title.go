@@ -57,6 +57,21 @@ func (g *Game) titleText(dst *ebiten.Image, text string, cx, cy, scale float64) 
 	g.drawGlyph(dst, img, w, h, cx, cy, scale, titleAccent)
 }
 
+// titleFactionText is titleText in a fleet's own colour, for the one line that
+// names a faction. Everything else is identical — same glyph, same outline,
+// same scale rule — because colour is the only thing that should say WHOSE, and
+// never a second typeface.
+func (g *Game) titleFactionText(dst *ebiten.Image, text string, cx, cy, scale float64, faction int) {
+	img := g.numberImage(text)
+	w := float64(img.Bounds().Dx())
+	h := float64(img.Bounds().Dy())
+	off := 1 + scale*0.35
+	for _, d := range outlineDirs {
+		g.drawGlyph(dst, img, w, h, cx+d[0]*off, cy+d[1]*off, scale, titleOutline)
+	}
+	g.drawGlyph(dst, img, w, h, cx, cy, scale, factionColor(faction))
+}
+
 // attractPageFrames is how long each attract page (the title, then the records) holds before
 // the front door flips to the other — an arcade cabinet cycling its screens (~8s at 60fps).
 const attractPageFrames = 8 * 60
