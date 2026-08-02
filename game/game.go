@@ -208,6 +208,7 @@ type Game struct {
 	trace     *battleTrace  // battle events as JSONL (headless trace, or the visual control plane); nil = silent
 	ctrl      *controlInbox // skirmish: the control plane's command mailbox (see control.go)
 	salvageCD int           // skirmish: ticks until the field produces another pickup
+	beams     []shipBeam    // skirmish: laser burns still being drawn (see shiparms.go)
 	arenaSeed int64         // the seed the current arena was generated from
 
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
@@ -778,6 +779,7 @@ func (g *Game) Update() error {
 	g.stepArrivals()      // vortices land the ships they were opened for (skirmish)
 	g.resolveSalvage()    // skirmish: ships collect what the battle leaves lying about
 	g.stepSalvageDrops()  // skirmish: and the field keeps producing more
+	g.stepShipBeams()     // skirmish: laser burns fade out
 	g.stepProjectiles()
 	g.stepAllies()
 	g.updateEnemies()
@@ -1283,6 +1285,7 @@ func (g *Game) drawEntityGlow(emissive *ebiten.Image, cam ebiten.GeoM, camX, cam
 	}
 	g.drawAllyGlow(emissive, camX, camY, camAngle)
 	g.drawLaser(emissive, cam, true)
+	g.drawShipBeams(emissive, cam, true)
 	g.drawBolts(emissive, cam, g.projectiles, true)
 	g.drawBolts(emissive, cam, g.enemyShots, true)
 	g.drawMines(emissive, cam, true)
@@ -1311,6 +1314,7 @@ func (g *Game) drawEntityLayer(dst *ebiten.Image, cam ebiten.GeoM, camX, camY, c
 	}
 	g.drawAllies(dst, camX, camY, camAngle) // friendly companions, over the world
 	g.drawLaser(dst, cam, false)
+	g.drawShipBeams(dst, cam, false)
 	g.drawBolts(dst, cam, g.projectiles, false)
 	g.drawBolts(dst, cam, g.enemyShots, false)
 	g.drawMines(dst, cam, false)

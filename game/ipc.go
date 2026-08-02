@@ -93,6 +93,7 @@ type ipcShipState struct {
 	Hull      int          `json:"hull"`
 	HullMax   int          `json:"hullMax"`
 	Shield    int          `json:"shield"`
+	Weapon    string       `json:"weapon"` // "" = the hull's own bolt; see shiparms.go
 	Speed     float64      `json:"speed"`
 	Radar     float64      `json:"radar"`
 	FireReady bool         `json:"fireReady"`
@@ -254,7 +255,7 @@ func (g *Game) ipcShipState(e *entity) ipcShipState {
 	return ipcShipState{
 		ID: e.id, Kind: e.kindName(),
 		X: e.x, Y: e.y, VX: e.vx, VY: e.vy,
-		Heading: e.angle, Hull: e.hp, HullMax: e.hullMax(), Shield: e.shield,
+		Heading: e.angle, Hull: e.hp, HullMax: e.hullMax(), Shield: e.shield, Weapon: e.weaponKey,
 		Speed: e.moveSpeed(), Radar: e.detectRange(),
 		FireReady: e.fireCD <= 0,
 		Allies:    ipcContacts(allies),

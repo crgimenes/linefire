@@ -38,8 +38,16 @@ const (
 )
 
 // salvageDrops is what the field spontaneously produces, in the proportion the
-// campaign's own table favours: mostly repairs, sometimes an edge.
-var salvageDrops = []string{"powerup", "powerup", "shield", "firepower", "ratepower", "damagepower"}
+// campaign's own table favours: mostly repairs, sometimes an edge — and, rarely,
+// a weapon. The laser is the rarest thing on the field on purpose: a fleet that
+// gets one changes the battle, so it has to be worth crossing the arena for.
+var salvageDrops = []string{
+	"powerup", "powerup", "powerup",
+	"shield", "shield",
+	"firepower", "ratepower", "damagepower",
+	"wpn_missile",
+	"wpn_laser",
+}
 
 // resolveSalvage hands every pickup a ship is touching to that ship. Pickups
 // are removed after the whole pass, so no index shifts under it.
@@ -49,7 +57,13 @@ func (g *Game) resolveSalvage() {
 	}
 	var taken []int
 	for i := range g.entities {
-		if g.entities[i].kind != kindPowerUp {
+		switch g.entities[i].kind {
+		case kindPowerUp:
+		case kindWeapon:
+			if !shipCanCarry(g.entities[i].power) {
+				continue // nothing a hull can fire: it stays where it fell
+			}
+		default:
 			continue
 		}
 		j := g.shipReaching(i)
@@ -88,6 +102,14 @@ func (g *Game) shipReaching(pi int) int {
 // salvage applies the pickup at index pi to the ship at index si.
 func (g *Game) salvage(si, pi int) {
 	e, p := &g.entities[si], &g.entities[pi]
+	if p.kind == kindWeapon {
+		e.weaponKey = p.power // a fresh weapon replaces whatever it was carrying
+		g.match.recordSalvage(e.faction)
+		g.emitBurst(p.x, p.y, pickupMotes)
+		g.playEvent(p.a, "pickup")
+		g.traceSalvage(e, p.power)
+		return
+	}
 	switch p.power {
 	case powerShield:
 		e.shield = min(e.shield+shipShieldAmount, shipMaxShield)

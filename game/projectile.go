@@ -237,6 +237,10 @@ func (g *Game) stepEnemyShots() {
 		}
 		rx, ry, hitRock := g.bulletRockHit(p.px, p.py, nx, ny)
 		if hitRock {
+			if p.aoe > 0 {
+				g.shipBlast(rx, ry, &p) // a missile into rock still detonates
+				continue
+			}
 			g.dig(rx, ry, p.dmg) // SPIKE: enemy fire chews the rock too
 			// The player's wall sparks (impactBurst) in the shot's own color. The
 			// spark COUNT is not shared: impactBurst scales it by damage, and enemy
@@ -252,6 +256,11 @@ func (g *Game) stepEnemyShots() {
 		// faction in its path. The campaign's horde is all faction 0, so its
 		// own fire keeps passing through its own kind, exactly as before.
 		if hit := g.bulletHitsFoe(p.px, p.py, nx, ny, p.faction); hit >= 0 {
+			if p.aoe > 0 {
+				p.x, p.y = nx, ny
+				g.shipBlast(nx, ny, &p) // an area weapon: the blast decides who it hurts
+				continue
+			}
 			victim := g.entities[hit].faction
 			hull := max(p.hullDmg, shipShotHullDamage) // a directly-built shot (tests) hits for the baseline
 			if g.damageEnemy(hit, hull, p.rglow, p.sid) {

@@ -136,19 +136,34 @@ func TestLootIsVisibleUnderSensorRules(t *testing.T) {
 	}
 }
 
-// A weapon drop is left where it lies: no ship has an arsenal to put it in
-// yet, and a fleet must never appear to carry a weapon it cannot fire.
-func TestWeaponDropsAreNotSalvagedYet(t *testing.T) {
+// A ship takes a weapon it can actually fire, and leaves one it cannot: a
+// fleet must never appear to carry something it will never use.
+func TestOnlyFirableWeaponsAreSalvaged(t *testing.T) {
 	g := salvageGame(t)
 	w := pickup("missile", 500, 500)
 	w.kind = kindWeapon
 	g.entities = append(g.entities, w)
+	g.resolveSalvage()
 
+	if got := g.entities[0].weaponKey; got != "missile" {
+		t.Fatalf("the ship carries %q, want the missile it flew over", got)
+	}
+	if len(g.entities) != 1 {
+		t.Fatal("the weapon should be consumed")
+	}
+
+	// A deployed weapon stays where it fell: no hull knows how to place one.
+	mine := pickup("mine", 500, 500)
+	mine.kind = kindWeapon
+	g.entities = append(g.entities, mine)
 	g.resolveSalvage()
 	if len(g.entities) != 2 {
-		t.Fatal("a weapon should stay on the field until ships have an arsenal")
+		t.Fatal("a mine is not something a hull can fire: it should stay on the field")
 	}
-	// It is still visible: a program can see it coming before it can use it.
+	if got := g.entities[0].weaponKey; got != "missile" {
+		t.Fatalf("the ship swapped to %q; a mine should not have been taken", got)
+	}
+	// It is still visible either way: a program sees the field, not the rules.
 	if loot := g.lootContacts(&g.entities[0]); len(loot) != 1 {
 		t.Fatalf("a weapon on the field should be visible loot, got %+v", loot)
 	}

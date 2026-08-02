@@ -42,6 +42,11 @@ import (
 //	self-shield          salvaged shield: it absorbs damage before the hull
 //	self-hull-max        what this hull was built with, so a program can tell
 //	                     a scratch from a wreck and decide to go for a repair
+//	self-weapon          the salvaged weapon this hull fires ("" = its own
+//	                     bolt, "missile" = an area weapon whose blast hurts
+//	                     ALLIES too, "laser" = instant, burns everything on
+//	                     the firing line). A program that knows what it is
+//	                     holding can choose where to stand.
 //	allies enemies       lists of VISIBLE contacts — inside self-radar AND in
 //	                     line of sight (rock hides what is behind it) — sorted
 //	                     nearest first. Each contact is a list of five values:
@@ -330,6 +335,7 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	mem["self-radar"] = filo.VNum(e.detectRange())
 	mem["self-shield"] = filo.VNum(float64(e.shield))
 	mem["self-hull-max"] = filo.VNum(float64(e.hullMax()))
+	mem["self-weapon"] = filo.VString(e.weaponKey)
 	mem["fire-ready"] = filo.VBool(e.fireCD <= 0)
 	mem["field-w"] = filo.VNum(g.bounds.w())
 	mem["field-h"] = filo.VNum(g.bounds.h())

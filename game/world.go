@@ -64,6 +64,7 @@ type entity struct {
 	dmgMod     int     // salvaged combat mods: harder bolts, shorter interval, wider volley
 	rateMod    int
 	fireMod    int
+	weaponKey  string     // salvaged weapon ("" = the archetype bolt); see shiparms.go
 	pilot      *shipPilot // skirmish: the Filo program flying this hull (nil = house brain)
 	a          *asset.Asset
 	mesh       *render.Mesh // nil if the asset is missing
@@ -595,9 +596,13 @@ func (g *Game) patrol(e *entity) {
 	e.angle = turnToward(e.angle, target, enemyTurnRate)
 }
 
-// enemyFire spawns this hull's volley at the target's current position: one
-// bolt, or a narrow fan of them once the ship has salvaged fire mods.
+// enemyFire spawns this hull's volley at the target's current position: the
+// salvaged weapon if it carries one, otherwise its archetype bolt — one, or a
+// narrow fan of them once the ship has salvaged fire mods.
 func (g *Game) enemyFire(e *entity, tx, ty float64) {
+	if g.fireCarried(e, tx, ty) {
+		return
+	}
 	dx, dy := tx-e.x, ty-e.y
 	d := math.Hypot(dx, dy)
 	if d == 0 {
