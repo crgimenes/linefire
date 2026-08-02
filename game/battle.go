@@ -86,7 +86,7 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	if opts.Factions > 0 {
 		g.factions = min(opts.Factions, maxFactions)
 	}
-	// #nosec G404 -- deterministic battle simulation, not a security boundary
+	// #nosec G404 G115 -- deterministic battle simulation, not a security boundary; a negative seed wrapping into the PCG stream is a seed like any other
 	g.simRand = rand.New(rand.NewPCG(uint64(opts.Seed), 0x53494d)) // stream = "SIM"
 	g.trace = newBattleTrace(opts.Trace)
 	if len(opts.Programs) > 0 {
@@ -114,7 +114,7 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	// Land the fleets through the same vortex machinery the screen uses (which
 	// deals the factions round-robin and keeps arrivals off walls and off each
 	// other), just without waiting for the show.
-	// #nosec G404 -- deterministic battle placement, not a security boundary
+	// #nosec G404 G115 -- deterministic battle placement, not a security boundary; a negative seed wrapping into the PCG stream is a seed like any other
 	rng := rand.New(rand.NewPCG(uint64(opts.Seed), 0x424154544c45)) // stream = "BATTLE"
 	for i := 0; i < ships*g.factions; i++ {
 		g.spawnArrival(battleKinds[i%len(battleKinds)], rng)
@@ -131,6 +131,9 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 		g.stepEnemyShots()
 		g.resolveSalvage()   // the same systems Update steps: a headless battle
 		g.stepSalvageDrops() // is the same battle, or it measures a different game
+		g.stepMines()        // deployed weapons live in the world, not in the draw
+		g.stepDevourer()
+		g.stepShipBeams() // cosmetic, but left unstepped it is a slice that only grows
 		if tick%snapEvery == 0 {
 			g.traceSnapshot(last)
 		}

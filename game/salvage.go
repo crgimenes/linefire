@@ -17,9 +17,10 @@ import "math"
 //	rate    it fires more often
 //	fire    it fires more bolts at once, in a narrow fan
 //
-// Weapons (the missile the tanks drop) are NOT salvaged yet: a ship has no
-// arsenal to put one in, and pretending otherwise would show a fleet carrying
-// a weapon it never fires. They stay on the field for the arsenal step.
+// Weapons are salvaged too, and what a hull then does with one lives in
+// shiparms.go: the aimed ones are fired at a point, the dropped ones are laid
+// where the ship stands. The only thing on the field a hull will not stoop for
+// is the front gun, which is what it already fires.
 const (
 	shipHealAmount   = 2 // hull points a repair restores
 	shipShieldAmount = 3 // shield points a canister grants
@@ -39,14 +40,21 @@ const (
 
 // salvageDrops is what the field spontaneously produces, in the proportion the
 // campaign's own table favours: mostly repairs, sometimes an edge — and, rarely,
-// a weapon. The laser is the rarest thing on the field on purpose: a fleet that
-// gets one changes the battle, so it has to be worth crossing the arena for.
+// a weapon. The laser and the devourer are the rarest things out there, and
+// equally rare on purpose: one is the prize and the other is the trap, and a
+// trap has to be as much of a surprise as a prize or nobody ever falls for it.
+// A fleet that reaches either changes the battle — one of them in the direction
+// it was hoping for.
 var salvageDrops = []string{
-	"powerup", "powerup", "powerup",
-	"shield", "shield",
-	"firepower", "ratepower", "damagepower",
-	"wpn_missile",
+	"powerup", "powerup", "powerup", "powerup", "powerup", "powerup",
+	"shield", "shield", "shield", "shield",
+	"firepower", "firepower",
+	"ratepower", "ratepower",
+	"damagepower", "damagepower",
+	"wpn_missile", "wpn_missile",
+	"wpn_mine", "wpn_mine",
 	"wpn_laser",
+	"wpn_devourer",
 }
 
 // resolveSalvage hands every pickup a ship is touching to that ship. Pickups

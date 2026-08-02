@@ -441,67 +441,92 @@ func (g *Game) enemyTarget(e *entity) (tx, ty float64, ok bool) {
 	return g.entities[best].x, g.entities[best].y, true
 }
 
-// updateEnemies turns each enemy to face its target and fires at it on a
-// cooldown. Position is left fixed for now; movement comes later.
+// updateEnemies gives every enemy its tick.
+//
+// A hull can VANISH from the slice while this loop is running: a laser is
+// hitscan, so the ship firing below kills in the same call, and damageEnemy
+// takes the wreck out of g.entities at once. Ranging over the slice fixes the
+// length up front and panics the moment that happens, so this walks against
+// the LIVE length and, when the slice has closed up behind it, stays on the
+// index — the ship that just slid into that slot has not had its tick yet.
+// Ships carry unique non-zero ids, which is what makes the shift detectable;
+// everything else in the slice does nothing here, so it costs nothing when two
+// of those swap places unnoticed.
+//
+// yagni: one step of compensation, so a beam that kills TWO hulls behind the
+// cursor in the same call still costs one ship a single tick. Nobody crashes
+// and it corrects itself on the next one. The exact version needs a per-hull
+// "already ticked this pass" mark, and that is worth adding the day ordering
+// is shown to decide a battle.
 func (g *Game) updateEnemies() {
-	for i := range g.entities {
-		e := &g.entities[i]
-		if e.kind != kindEnemy {
-			continue
+	for i := 0; i < len(g.entities); i++ {
+		id := g.entities[i].id
+		g.updateEnemy(&g.entities[i])
+		if i < len(g.entities) && g.entities[i].id != id {
+			i--
 		}
-		if e.hitFlash > 0 {
-			e.hitFlash--
-		}
-		if e.fireCD > 0 {
-			e.fireCD--
-		}
-
-		// A driven ship is flown by its faction's external driver (IPC) or
-		// its Filo program; the house brain below is what flies everyone
-		// else — and any driver the moment it errors or goes silent.
-		if d := g.ipcDrivers[e.faction]; d != nil && g.runIPCShip(d, e) {
-			continue
-		}
-		if e.pilot != nil && g.runPilot(e) {
-			continue
-		}
-
-		tx, ty, hunting := g.enemyTarget(e)
-		if !hunting {
-			if !e.stationary {
-				g.patrol(e) // nothing left to hunt: wander
-			}
-			continue
-		}
-		dx, dy := tx-e.x, ty-e.y
-		r := e.detectRange()
-		inRange := dx*dx+dy*dy <= r*r
-		los := inRange && g.lineOfSight(e.x, e.y, tx, ty)
-
-		if !g.enemyEngaged(e, inRange, los) {
-			if !e.stationary {
-				g.patrol(e) // idle: wander instead of standing still
-			}
-			continue
-		}
-
-		dist := math.Hypot(dx, dy)
-		if e.stationary {
-			// Turret: never moves; only swings to track the target when in sight.
-			if los {
-				e.angle = turnToward(e.angle, math.Atan2(dy, dx)*180/math.Pi, enemyTurnRate)
-			}
-		} else {
-			g.moveEnemyEngaged(e, tx, ty, dist, los)
-		}
-
-		// Fire only with a clear line of sight: it cannot shoot through walls.
-		if e.fireCD > 0 || !los {
-			continue
-		}
-		e.fireCD = e.fireInterval()
-		g.enemyFire(e, tx, ty)
 	}
+}
+
+// updateEnemy turns one enemy to face its target and fires at it on a
+// cooldown. The hull must not be touched after it shoots: a kill can move the
+// slice under this pointer.
+func (g *Game) updateEnemy(e *entity) {
+	if e.kind != kindEnemy {
+		return
+	}
+	if e.hitFlash > 0 {
+		e.hitFlash--
+	}
+	if e.fireCD > 0 {
+		e.fireCD--
+	}
+
+	// A driven ship is flown by its faction's external driver (IPC) or
+	// its Filo program; the house brain below is what flies everyone
+	// else — and any driver the moment it errors or goes silent.
+	if d := g.ipcDrivers[e.faction]; d != nil && g.runIPCShip(d, e) {
+		return
+	}
+	if e.pilot != nil && g.runPilot(e) {
+		return
+	}
+
+	tx, ty, hunting := g.enemyTarget(e)
+	if !hunting {
+		if !e.stationary {
+			g.patrol(e) // nothing left to hunt: wander
+		}
+		return
+	}
+	dx, dy := tx-e.x, ty-e.y
+	r := e.detectRange()
+	inRange := dx*dx+dy*dy <= r*r
+	los := inRange && g.lineOfSight(e.x, e.y, tx, ty)
+
+	if !g.enemyEngaged(e, inRange, los) {
+		if !e.stationary {
+			g.patrol(e) // idle: wander instead of standing still
+		}
+		return
+	}
+
+	dist := math.Hypot(dx, dy)
+	if e.stationary {
+		// Turret: never moves; only swings to track the target when in sight.
+		if los {
+			e.angle = turnToward(e.angle, math.Atan2(dy, dx)*180/math.Pi, enemyTurnRate)
+		}
+	} else {
+		g.moveEnemyEngaged(e, tx, ty, dist, los)
+	}
+
+	// Fire only with a clear line of sight: it cannot shoot through walls.
+	if e.fireCD > 0 || !los {
+		return
+	}
+	e.fireCD = e.fireInterval()
+	g.enemyFire(e, tx, ty)
 }
 
 // moveEnemyEngaged runs a mobile enemy's engaged movement: hold/orbit at the

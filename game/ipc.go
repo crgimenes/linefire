@@ -40,6 +40,12 @@ import (
 // ship shoots every time its cooldown allows while the order stands. A ship
 // with no standing order patrols like the house brain's idle ships.
 //
+// One trap worth knowing before leaving a fire order standing: a ship whose
+// "weapon" is a DROPPED one ("mine", "devourer") ignores the point and lays
+// the weapon where it is standing, again and again while the order holds.
+// With the devourer that is a black hole under your own fleet — pilot.go
+// spells out what each weapon key does.
+//
 // A driver that closes its stream or writes a broken line is reported once
 // and its faction falls back to the house brain — the same grace the Filo
 // pilots get: a dead process makes dumb ships, never dead ones.

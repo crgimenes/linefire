@@ -42,11 +42,19 @@ import (
 //	self-shield          salvaged shield: it absorbs damage before the hull
 //	self-hull-max        what this hull was built with, so a program can tell
 //	                     a scratch from a wreck and decide to go for a repair
-//	self-weapon          the salvaged weapon this hull fires ("" = its own
-//	                     bolt, "missile" = an area weapon whose blast hurts
-//	                     ALLIES too, "laser" = instant, burns everything on
-//	                     the firing line). A program that knows what it is
-//	                     holding can choose where to stand.
+//	self-weapon          the salvaged weapon this hull carries ("" = its own
+//	                     bolt). A program that knows what it is holding can
+//	                     choose where to stand and when to shoot:
+//	                       "missile"   an area weapon whose blast hurts ALLIES
+//	                       "laser"     instant, burns everything on the line
+//	                       "mine"      dropped, not fired: it ignores its own
+//	                                   fleet and waits for anybody else
+//	                       "devourer"  dropped, and it ignores NOBODY. It drags
+//	                                   in every hull within reach — this
+//	                                   fleet's included — then implodes. One
+//	                                   use and it is spent. Flying over the
+//	                                   canister arms the trap; firing it in
+//	                                   formation springs it on yourself.
 //	allies enemies       lists of VISIBLE contacts — inside self-radar AND in
 //	                     line of sight (rock hides what is behind it) — sorted
 //	                     nearest first. Each contact is a list of five values:
@@ -74,7 +82,10 @@ import (
 //	               hull faces its movement. Returns #t.
 //	(fire x y)     shoot at a world point. Lands only if fire-ready (the
 //	               cooldown is the engine's); rock eats blind shots. Returns
-//	               #t when the shot was actually fired.
+//	               #t when the shot was actually fired. A DROPPED weapon (see
+//	               self-weapon) ignores the point entirely and is laid where
+//	               the ship is standing — which is exactly why (fire) is a
+//	               decision and not a reflex once a hull is carrying one.
 //
 // Math builtins (Go does the heavy lifting; Filo stays small): (dist x1 y1 x2
 // y2), (bearing x1 y1 x2 y2) -> degrees from point 1 to point 2, (norm-angle

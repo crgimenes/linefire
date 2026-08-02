@@ -58,10 +58,17 @@ var (
 )
 
 // devourer is the live black hole: only one exists at a time. It arms, then pulls, then collapses.
+//
+// In skirmish it is a fleet weapon (see deployShipDevourer), and the only one that answers to
+// nobody: the pull below already drags in EVERY entity, whatever colour it flies. by/sid exist
+// so the scoreboard and the trace can say who dropped it — a fleet takes credit for the hulls it
+// swallowed and takes the LOSSES for its own, exactly like the missile blast.
 type devourer struct {
 	x, y   float64
 	arm    int // frames of arming left (countdown shown; no pull yet)
 	active int // frames of active pull left (once arm hits 0)
+	by     int // faction that deployed it; 0 = the player's own
+	sid    int // hull that deployed it, for the trace
 }
 
 // deployDevourerWeapon drops the black hole at the ship, spending a charge. Refused with no
@@ -100,7 +107,9 @@ func (g *Game) stepDevourer() {
 		d.active--
 		g.devourerPull(d)
 		g.devourerPullAllies(d)
-		g.devourerCrushShip(d)
+		if !g.skirmishMode {
+			g.devourerCrushShip(d) // no player flies a skirmish: there is no hull here to crush
+		}
 		g.spawnDevourerDebris(d)
 		return
 	}
@@ -157,7 +166,7 @@ func (g *Game) pullToward(x, y, tx, ty, step, radius float64) (float64, float64)
 // the ship's own thrust fight it). Only during the active phase.
 func (g *Game) applyDevourerPull() {
 	d := g.devourer
-	if d == nil || d.arm > 0 || d.active <= 0 {
+	if d == nil || d.arm > 0 || d.active <= 0 || g.skirmishMode {
 		return
 	}
 	dx, dy := d.x-g.x, d.y-g.y
@@ -183,7 +192,7 @@ func (g *Game) devourerPull(d *devourer) {
 		dx, dy := d.x-e.x, d.y-e.y
 		dist := math.Hypot(dx, dy)
 		if dist <= devourerSwallow {
-			g.swallowEntity(&e)
+			g.swallowEntity(&e, d)
 			continue // gone
 		}
 		if dist < devourerReach {
@@ -222,15 +231,30 @@ func (g *Game) devourerPullAllies(d *devourer) {
 
 // swallowEntity destroys an object crushed at the core: a violet flash, score for a kill, and it
 // stays gone if the player revisits the map.
-func (g *Game) swallowEntity(e *entity) {
+//
+// The removal happens in the caller's slice rebuild, so this cannot go through damageEnemy — the
+// death has to be booked here or a hull would simply stop appearing in the trace with nothing
+// saying why, and the invariant checker would be right to call that a hole in the record.
+func (g *Game) swallowEntity(e *entity, d *devourer) {
 	g.emitBurst(e.x, e.y, devourerSwallowBurst)
 	g.markConsumed(e.spawn)
-	if e.kind == kindEnemy {
-		g.score++
-		g.emitExplosion(e.x, e.y) // it detonates the instant it hits the singularity
-		g.addShake(deathShake * 0.4)
-		g.playEvent(e.a, "destroy")
+	if e.kind != kindEnemy {
+		return
 	}
+	g.score++
+	g.emitExplosion(e.x, e.y) // it detonates the instant it hits the singularity
+	g.addShake(deathShake * 0.4)
+	g.playEvent(e.a, "destroy")
+	if !g.skirmishMode {
+		return
+	}
+	g.traceDeath(e, d.sid)
+	// The hole gets no credit for the fleet that fed it: the loss counts, the kill does not.
+	by := d.by
+	if e.faction == by {
+		by = 0
+	}
+	g.match.recordKill(by, e.faction)
 }
 
 // spawnDevourerDebris streams cosmetic wreckage inward from around the hole, to sell the suck.
@@ -253,15 +277,29 @@ func (g *Game) spawnDevourerDebris(d *devourer) {
 // any escorts caught in it, and hits a too-close player — plus a shockwave, a violet flare and a
 // hard shake.
 func (g *Game) collapseDevourer(d *devourer) {
-	g.explodeAt(d.x, d.y, weapon.Catalog[weapon.CatDevourer].Damage, devourerCollapseRadius, devourerColor)
+	g.collapseDamage(d)
 	g.digAt(d.x, d.y, devourerCollapseRadius) // level the structures in the blast (nil-safe on procedural maps)
-	g.destroyAlliesInRadius(d.x, d.y, devourerCollapseRadius)
 	g.emitBurst(d.x, d.y, devourerCollapseBurst)
 	g.addShake(deathShake * 1.8)
-	if dist := math.Hypot(g.x-d.x, g.y-d.y); dist < devourerCollapseRadius {
-		g.hurtPlayer(int(math.Ceil(float64(weapon.Catalog[weapon.CatDevourer].Damage) * (1 - dist/devourerCollapseRadius))))
-	}
 	g.logf("*** DEVOURER COLLAPSE ***")
+}
+
+// collapseDamage is who the implosion hurts. In skirmish it is a fleet blast like the missile's —
+// blind about who it burns, particular about who gets the credit. In the campaign it stays what it
+// always was: the enemies in range, the escorts caught in it, and a player who did not run.
+func (g *Game) collapseDamage(d *devourer) {
+	if g.skirmishMode {
+		g.shipBlast(d.x, d.y, devourerCollapseRadius, shipDevourerHullDamage,
+			blastSource{faction: d.by, sid: d.sid, col: devourerColor})
+		return
+	}
+	g.explodeAt(d.x, d.y, weapon.Catalog[weapon.CatDevourer].Damage, devourerCollapseRadius, devourerColor)
+	g.destroyAlliesInRadius(d.x, d.y, devourerCollapseRadius)
+	dist := math.Hypot(g.x-d.x, g.y-d.y)
+	if dist >= devourerCollapseRadius {
+		return
+	}
+	g.hurtPlayer(int(math.Ceil(float64(weapon.Catalog[weapon.CatDevourer].Damage) * (1 - dist/devourerCollapseRadius))))
 }
 
 // destroyAlliesInRadius removes every escort within r of (x,y) — the collapse spares nothing.
