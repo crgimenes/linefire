@@ -36,6 +36,12 @@ const (
 	salvageDropEvery = 420 // ticks between spontaneous drops (7s)
 	salvageDropInset = 120 // world units kept clear of the walls
 	salvageDropTries = 8
+	// What the field may hold UNCOLLECTED at once. The drip has no other
+	// brake — nothing removes a canister nobody flew over — so a long battle
+	// silted up until the arena was a carpet of pickups (crg watched a decided
+	// field fill with them). At the cap the field simply stops producing until
+	// somebody collects: scarcity is what made loot worth crossing the map for.
+	salvageMaxLoose = 12
 )
 
 // salvageDrops is what the field spontaneously produces, in the proportion the
@@ -55,6 +61,17 @@ var salvageDrops = []string{
 	"wpn_mine", "wpn_mine",
 	"wpn_laser",
 	"wpn_devourer",
+}
+
+// looseSalvage counts what is lying on the field waiting to be collected.
+func (g *Game) looseSalvage() int {
+	n := 0
+	for i := range g.entities {
+		if k := g.entities[i].kind; k == kindPowerUp || k == kindWeapon {
+			n++
+		}
+	}
+	return n
 }
 
 // resolveSalvage hands every pickup a ship is touching to that ship. Pickups
@@ -165,6 +182,9 @@ func (g *Game) stepSalvageDrops() {
 		return
 	}
 	g.salvageCD = salvageDropEvery
+	if g.looseSalvage() >= salvageMaxLoose {
+		return // the field is already littered; let the fleets clear some
+	}
 
 	minX, minY := g.bounds.minX+salvageDropInset, g.bounds.minY+salvageDropInset
 	spanX := max(g.bounds.maxX-salvageDropInset-minX, 1)

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"math"
 	"testing"
 
 	"github.com/crgimenes/linefire/weapon"
@@ -346,4 +347,76 @@ func TestAKillDuringTheTickDoesNotBreakTheLoop(t *testing.T) {
 		return
 	}
 	t.Fatal("the bystander vanished")
+}
+
+// The hole takes the MAP. A radius tuned for a scrolling campaign view left
+// hulls sitting untouched in the corners of an arena that is wider than it —
+// crg watched a devourer eat the middle of the field and nothing else. And the
+// law it follows there is his: everything is pulled, weakly at the far corner
+// so a hull running flat out the other way beats it, and overwhelmingly close
+// in so nothing does.
+func TestTheDevourerTakesTheWholeField(t *testing.T) {
+	g := salvageGame(t) // a 1000x1000 field
+	g.entities[0].weaponKey = "devourer"
+	g.enemyFire(&g.entities[0], 900, 500) // dropped at (500,500), the middle
+	if g.devourer == nil {
+		t.Fatal("no hole")
+	}
+	g.devourer.arm = 0
+	field := g.devourerField()
+
+	// The corner is inside the field — that is the whole complaint.
+	corner := math.Hypot(500, 500)
+	if corner > field {
+		t.Fatalf("the far corner (%.0f) is outside the pull (%.0f)", corner, field)
+	}
+
+	// A hull parked in the corner must be dragged, and a hull near the core
+	// dragged far harder: the well has a shape, not a switch.
+	far := g.devourerDrag(corner, field)
+	near := g.devourerDrag(80, field)
+	if far <= 0 {
+		t.Error("a hull in the corner feels nothing")
+	}
+	if near <= far {
+		t.Errorf("the well is inverted: %.2f at the core vs %.2f at the corner", near, far)
+	}
+
+	// The escape crg specified has to be real out there and hopeless in here.
+	speed := g.entities[0].moveSpeed()
+	if far >= speed {
+		t.Errorf("drag at the corner is %.2f against a hull's %.2f: running away cannot win", far, speed)
+	}
+	if near <= speed {
+		t.Errorf("drag near the core is %.2f against a hull's %.2f: it could just fly out", near, speed)
+	}
+}
+
+// And it really moves them: a corner hull is closer to the core after a tick.
+func TestACornerHullIsDraggedIn(t *testing.T) {
+	g := salvageGame(t)
+	g.entities[0].weaponKey = "devourer"
+	g.entities[0].spawn = -1
+	g.enemyFire(&g.entities[0], 900, 500)
+	g.devourer.arm = 0
+
+	corner := foe(9, 20, 20, 3) // the far corner of the 1000x1000 field
+	corner.spawn = -1
+	g.entities = append(g.entities, corner)
+	before := math.Hypot(500-20, 500-20)
+
+	g.stepDevourer()
+
+	var after float64
+	for i := range g.entities {
+		if g.entities[i].id == 9 {
+			after = math.Hypot(500-g.entities[i].x, 500-g.entities[i].y)
+		}
+	}
+	if after == 0 {
+		t.Fatal("the corner hull vanished")
+	}
+	if after >= before {
+		t.Errorf("the corner hull did not move toward the core: %.1f -> %.1f", before, after)
+	}
 }

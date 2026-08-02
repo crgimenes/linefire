@@ -1,6 +1,10 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crgimenes/linefire/level"
+)
 
 // salvageGame is one ship of faction 1 and whatever pickups a test drops
 // around it, in a bare skirmish world.
@@ -265,5 +269,40 @@ func TestAMissileIntoACrateBesideADyingHull(t *testing.T) {
 		case g.entities[i].kind == kindPowerUp:
 			t.Fatal("the crate survived a direct missile")
 		}
+	}
+}
+
+// The field drips loot and nothing else ever removes it, so a long battle
+// silted up into a carpet of canisters — crg watched a decided field fill with
+// them. The drip stops at a cap and resumes once the fleets clear some;
+// scarcity is what makes loot worth crossing the map for.
+func TestTheFieldStopsDrippingOnceItIsLittered(t *testing.T) {
+	g := salvageGame(t)
+	g.horde = newHorde(level.Horde{Types: []string{"enemy"}, Seed: 1})
+
+	// Run long enough to have dripped far past the cap.
+	for range salvageDropEvery * (salvageMaxLoose + 6) {
+		g.stepSalvageDrops()
+	}
+	loose := g.looseSalvage()
+	if loose == 0 {
+		t.Fatal("the field produced nothing at all: the fixture proves nothing")
+	}
+	if loose > salvageMaxLoose {
+		t.Fatalf("%d canisters on the field, cap is %d", loose, salvageMaxLoose)
+	}
+
+	// Collected loot makes room again: the cap is a ceiling, not a quota.
+	for i := len(g.entities) - 1; i >= 0 && g.looseSalvage() > 2; i-- {
+		if k := g.entities[i].kind; k == kindPowerUp || k == kindWeapon {
+			g.entities = append(g.entities[:i], g.entities[i+1:]...)
+		}
+	}
+	before := g.looseSalvage()
+	for range salvageDropEvery * 3 {
+		g.stepSalvageDrops()
+	}
+	if g.looseSalvage() <= before {
+		t.Error("the field never resumed dripping after the loot was collected")
 	}
 }

@@ -266,3 +266,51 @@ func TestTheAquariumIsNeverOver(t *testing.T) {
 		t.Error("the endless mode declared a winner; it has no end condition")
 	}
 }
+
+// A decided battle must FREEZE, not merely stop restarting. crg watched the
+// verdict stand on screen while the survivors wandered an empty field that
+// slowly filled with pickups nobody would collect. stepSkirmishMeta reports
+// the freeze and Update returns on it, so nothing below is stepped.
+func TestADecidedBattleReportsFrozen(t *testing.T) {
+	g, err := NewSkirmish(filoio.OSFS(), "../gameassets", SkirmishOptions{
+		Mode: MatchLastFleet, Ships: 2, Factions: 2,
+	})
+	if err != nil {
+		t.Fatalf("NewSkirmish: %v", err)
+	}
+	g.match.staged = true
+	// A battle needs both fleets ON the field, or the match is already decided
+	// by mutual destruction — an empty arena is a finished one.
+	g.entities = append(g.entities,
+		entity{kind: kindEnemy, id: 1, x: 100, y: 100, radius: 12, hp: 3, faction: 1},
+		entity{kind: kindEnemy, id: 2, x: 900, y: 900, radius: 12, hp: 3, faction: 2})
+
+	if g.stepSkirmishMeta() {
+		t.Fatal("a battle still being fought reported itself frozen")
+	}
+
+	g.match.winner, g.match.over = 2, true
+	if !g.stepSkirmishMeta() {
+		t.Error("a decided battle did not report frozen: the field would keep running")
+	}
+	// And it keeps reporting it — the freeze is the resting state, not an edge.
+	for range 120 {
+		if !g.stepSkirmishMeta() {
+			t.Fatal("the freeze did not hold")
+		}
+	}
+}
+
+// The aquarium never freezes: it has no end to reach, and the overlay must
+// keep flying for as long as it is left on a desktop.
+func TestTheAquariumNeverFreezes(t *testing.T) {
+	g, err := NewSkirmish(filoio.OSFS(), "../gameassets", SkirmishOptions{Mode: MatchEndless})
+	if err != nil {
+		t.Fatalf("NewSkirmish: %v", err)
+	}
+	for range 60 {
+		if g.stepSkirmishMeta() {
+			t.Fatal("the endless aquarium froze")
+		}
+	}
+}

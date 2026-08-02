@@ -677,8 +677,13 @@ func (g *Game) Update() error {
 	// autonomous sim runs below (the input branch flies it on autopilot).
 	switch {
 	case g.skirmishMode:
-		g.stepSkirmishMeta() // only the periodic regen: the overlay window has no player at the keys
-		g.stepIPC()          // feed the external drivers their factions' state
+		// The meta-loop owns the arena and the match; it reports a decided
+		// battle, and a decided battle does not move again — the verdict stands
+		// over the field exactly as it ended.
+		if g.stepSkirmishMeta() {
+			return nil
+		}
+		g.stepIPC() // feed the external drivers their factions' state
 	case g.creditsMode:
 		if g.titleMode && inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			g.sfx.saveConfig()

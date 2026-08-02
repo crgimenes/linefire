@@ -282,19 +282,27 @@ func (g *Game) arenaFitsView() bool {
 // regeneration, plus a rebuild when the arena no longer fits the view. No scroll,
 // no Konami code, no Esc/R — the window is click-through, so there is no player
 // to press them.
-func (g *Game) stepSkirmishMeta() {
+// It reports whether the battle is DECIDED, in which case the caller must not
+// step the world: a finished match freezes where it ended. Without that the
+// verdict stood on screen while the survivors kept wandering an empty field
+// that slowly filled with pickups nobody would ever collect — crg watched it
+// happen. The control plane is consumed first either way, so Restage and a
+// fresh Deploy still land on a frozen battle.
+func (g *Game) stepSkirmishMeta() (frozen bool) {
 	g.consumeCommand() // the control plane speaks between ticks, on this goroutine
 	// A real match owns its arena for its whole length: no regeneration mid
 	// battle. The periodic regen is the AQUARIUM's — attract-screen heritage,
 	// kept only where nothing ever ends.
 	if g.match != nil && g.match.Mode != MatchEndless {
 		g.stepMatchMeta()
-		return
+		_, over := g.match.Over()
+		return over
 	}
 	g.creditsRegenCD--
 	if g.creditsRegenCD <= 0 || !g.arenaFitsView() {
 		g.buildCreditsArena() // a fresh field to keep flying and fighting in
 	}
+	return false
 }
 
 // spawnArrival opens a vortex somewhere on the field for a ship of the given

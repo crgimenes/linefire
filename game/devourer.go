@@ -29,6 +29,11 @@ const (
 	devourerPullMaxMul = 3.0    // closer = stronger; this caps how much the pull ramps near the core
 	devourerEntityPull = 7.0    // base world units/frame an object is dragged in (ramps like the player pull)
 	devourerSwallow    = 34.0   // objects (and the ship) within this of the core are destroyed
+	// Skirmish's law (see devourerDrag): the drag at the FAR CORNER, as a
+	// fraction of a hull's speed — small enough that running flat out the other
+	// way beats it — and the ceiling it climbs to near the core.
+	devourerRimDrag = 0.6
+	devourerMaxDrag = 12.0
 
 	devourerDanger    = 150.0 // within this of the core the singularity shreds the SHIP's hull
 	devourerDangerDPS = 4     // base hull damage per tick in the danger zone (scales up toward the core)
@@ -139,6 +144,39 @@ func devourerRamp(dist float64) float64 {
 	return math.Min(devourerReach/dist, devourerPullMaxMul)
 }
 
+// devourerField is how far the pull reaches.
+//
+// The campaign's radius means "the whole screen and beyond" on a view that
+// scrolls with the player. A skirmish arena IS the screen, all of it at once,
+// and it is wider than 1200 — so hulls in the corners sat there untouched
+// while the hole ate the middle, which is not what a black hole is. Here it
+// reaches corner to corner: nothing on the map is outside it (crg's rule).
+func (g *Game) devourerField() float64 {
+	if !g.skirmishMode {
+		return devourerReach
+	}
+	return math.Hypot(g.bounds.w(), g.bounds.h())
+}
+
+// devourerDrag is how far a hull is dragged this frame from dist away.
+//
+// The campaign keeps its own ramp, tuned as a player weapon. Skirmish follows
+// crg's rule instead — the map is attracted, and the only way out is full
+// thrust the other way and a prayer — which needs the far field WEAK: the drag
+// falls off as 1/dist, set so that at the far corner it is a fraction of a
+// hull's speed and a ship running flat out the other way wins. They cross at
+// about a third of the field: inside that, nothing escapes, whatever it does.
+//
+// The step is capped at dist so a hull lands on the core instead of asymptoting
+// to the swallow ring and hanging there forever.
+func (g *Game) devourerDrag(dist, field float64) float64 {
+	if !g.skirmishMode {
+		return math.Min(devourerEntityPull*devourerRamp(dist), dist)
+	}
+	pull := devourerRimDrag * field / math.Max(dist, 1)
+	return math.Min(math.Min(pull, devourerMaxDrag), dist)
+}
+
 // pullToward drags a point of the given collision radius toward (tx,ty) by step, but STOPS it at
 // walls (axis-separated, so it slides along a face) — a dragged object piles up against rock
 // instead of clipping through it. Returns the new position.
@@ -182,6 +220,7 @@ func (g *Game) applyDevourerPull() {
 // devourerPull drags every eligible object toward the core and swallows anything that arrives.
 // Objects are moved directly (not steered), so an enemy cannot fly against the pull.
 func (g *Game) devourerPull(d *devourer) {
+	field := g.devourerField()
 	kept := g.entities[:0]
 	for i := range g.entities {
 		e := g.entities[i]
@@ -195,12 +234,10 @@ func (g *Game) devourerPull(d *devourer) {
 			g.swallowEntity(&e, d)
 			continue // gone
 		}
-		if dist < devourerReach {
-			// Cap the step at dist (not dist-swallow), or it asymptotes to the swallow ring and
-			// the object hangs there forever instead of being pulled into the core. Walls block
-			// it, so an object dragged into rock piles up against the face instead of clipping.
-			step := math.Min(devourerEntityPull*devourerRamp(dist), dist)
-			e.x, e.y = g.pullToward(e.x, e.y, d.x, d.y, step, math.Max(e.radius, 6))
+		if dist < field {
+			// Walls block the drag, so an object pulled into rock piles up
+			// against the face instead of clipping through it.
+			e.x, e.y = g.pullToward(e.x, e.y, d.x, d.y, g.devourerDrag(dist, field), math.Max(e.radius, 6))
 		}
 		kept = append(kept, e)
 	}
@@ -210,6 +247,7 @@ func (g *Game) devourerPull(d *devourer) {
 // devourerPullAllies drags the player's escorts and drones in too — the black hole plays no
 // favourites — and destroys any that reach the core.
 func (g *Game) devourerPullAllies(d *devourer) {
+	field := g.devourerField()
 	kept := g.allies[:0]
 	for i := range g.allies {
 		a := g.allies[i]
@@ -220,9 +258,8 @@ func (g *Game) devourerPullAllies(d *devourer) {
 			g.emitExplosion(a.x, a.y)
 			continue
 		}
-		if dist < devourerReach {
-			step := math.Min(devourerEntityPull*devourerRamp(dist), dist)
-			a.x, a.y = g.pullToward(a.x, a.y, d.x, d.y, step, 10)
+		if dist < field {
+			a.x, a.y = g.pullToward(a.x, a.y, d.x, d.y, g.devourerDrag(dist, field), 10)
 		}
 		kept = append(kept, a)
 	}
