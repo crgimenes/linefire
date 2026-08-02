@@ -82,6 +82,50 @@ func TestTimedJudgesByKillsAtTheDeadline(t *testing.T) {
 	}
 }
 
+// The opening battle waits for the window to settle. A window reports the
+// requested size, then whatever the platform actually gave it, and a battle
+// staged in between is dealt onto an arena about to be rebuilt — which is
+// exactly what made the boot sequence stage three battles in a third of a
+// second, ships materialising and vanishing twice before the real one began.
+func TestOpeningBattleWaitsForTheViewToSettle(t *testing.T) {
+	g, err := NewSkirmish(filoio.OSFS(), "../gameassets", SkirmishOptions{
+		Mode: MatchLastFleet, Ships: 2,
+	})
+	if err != nil {
+		t.Fatalf("NewSkirmish: %v", err)
+	}
+	if g.match.staged {
+		t.Fatal("the battle was staged before any view existed")
+	}
+
+	// A window still settling: the size changes every few ticks, and each
+	// change must restart the wait.
+	g.dpr = 1
+	for i, size := range [][2]int{{800, 600}, {1280, 720}, {1600, 900}} {
+		g.sw, g.sh = size[0], size[1]
+		for range stageStableTicks - 1 {
+			g.stepSkirmishMeta()
+		}
+		if g.match.staged {
+			t.Fatalf("staged while the view was still changing (size %d)", i)
+		}
+	}
+
+	// The size holds still: the battle is staged once, on the settled arena.
+	for range stageStableTicks + 1 {
+		g.stepSkirmishMeta()
+	}
+	if !g.match.staged {
+		t.Fatal("the battle never staged on a settled view")
+	}
+	if !g.arenaFitsView() {
+		t.Fatalf("staged on an arena that does not fit the view: %v vs %v", g.level.Size, [2]int{g.sw, g.sh})
+	}
+	if n := len(g.arrivals) + len(g.entities); n == 0 {
+		t.Fatal("the fleets were never dealt")
+	}
+}
+
 // The scoreboard is fed by the real fight: in a battle to annihilation, one
 // side's kills are the other side's losses, and both equal the dead.
 func TestBattleScoreboardReconciles(t *testing.T) {

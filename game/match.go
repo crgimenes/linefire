@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strings"
 )
@@ -52,7 +53,20 @@ type Match struct {
 	winner   int // faction that prevailed; 0 = draw (or not over yet)
 	cooldown int
 	Stats    map[int]*FleetStats
+
+	// A battle is staged once the view has stopped changing size: a window
+	// settles into its real dimensions over the first frames (the requested
+	// size, then what the platform actually gave), and fleets dealt onto an
+	// arena that is about to be rebuilt are dealt twice for nothing.
+	staged    bool
+	stableW   float64
+	stableH   float64
+	stableFor int
 }
+
+// stageStableTicks is how long the view size must hold still before the first
+// battle of a session is staged.
+const stageStableTicks = 10
 
 // newMatch validates and builds a match. An empty mode is the aquarium.
 func newMatch(mode string, ships, duration, factions int) (*Match, error) {
@@ -193,22 +207,15 @@ func (g *Game) presentFactions() (present, lastAlive int) {
 	return len(seen), lastAlive
 }
 
-// matchRefitGraceTicks is how long into a battle a wrong-sized arena still
-// restages it: the view's real size arrives only after the first Layout, so
-// the boot battle would otherwise be fought on the pre-Layout default field.
-const matchRefitGraceTicks = 120
-
 // stepMatchMeta is the skirmish meta-loop for REAL matches (the endless
 // aquarium keeps stepSkirmishMeta's regeneration): tick the match, and when it
 // is decided let the survivors fly their lap, then stage the next battle on a
-// fresh field.
+// fresh field. A match owns its arena for its whole length, so a window
+// resized mid-battle is honoured by the NEXT battle.
 func (g *Game) stepMatchMeta() {
 	m := g.match
-	// A match owns its arena, so a mid-battle window resize waits for the next
-	// one — but a misfit in the opening moments is the boot case (see the
-	// grace constant) and restages on a right-sized field.
-	if !m.over && m.tick < matchRefitGraceTicks && !g.arenaFitsView() {
-		g.startMatch()
+	if !m.staged {
+		g.stageWhenViewSettles()
 		return
 	}
 	if m.over {
@@ -228,6 +235,28 @@ func (g *Game) stepMatchMeta() {
 	}
 }
 
+// stageWhenViewSettles holds the opening battle until the window has stopped
+// changing size, then stages it. Without this the boot sequence staged a
+// battle onto the pre-Layout default arena, then again for each size the
+// window passed through on its way to its real one — three fleets dealt and
+// two of them thrown away, which reads on screen as ships materialising and
+// vanishing before the battle finally begins.
+// A world with no view at all — a headless test — never reports a size; it
+// simply waits out the same count and stages on whatever arena it has, so
+// nothing can hang waiting for a window that will never exist.
+func (g *Game) stageWhenViewSettles() {
+	m := g.match
+	m.stableFor++
+	w, h := g.arenaWorldSize()
+	if w > 0 && h > 0 && (math.Abs(w-m.stableW) > 1 || math.Abs(h-m.stableH) > 1) {
+		m.stableW, m.stableH, m.stableFor = w, h, 0
+		return
+	}
+	if m.stableFor >= stageStableTicks {
+		g.startMatch()
+	}
+}
+
 // startMatch stages a battle: a fresh field, a fresh scoreboard, and each
 // faction's fleet dealt into its vortices.
 func (g *Game) startMatch() {
@@ -236,6 +265,7 @@ func (g *Game) startMatch() {
 	if err != nil {
 		return // unreachable: the running mode was validated at launch
 	}
+	m.staged = true // whatever startMatch deals is a battle in progress
 	g.match = m
 	g.dealFleets()
 	g.emitBattleEvent()

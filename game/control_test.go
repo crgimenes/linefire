@@ -21,6 +21,14 @@ func TestControlPlaneStagesAndReconfigures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSkirmish: %v", err)
 	}
+	// The opening battle waits for the view to settle before it is staged, so
+	// nothing is announced until then.
+	if events.Len() != 0 {
+		t.Fatalf("a battle was announced before the view settled: %s", events.String())
+	}
+	for range stageStableTicks + 1 {
+		g.stepSkirmishMeta()
+	}
 	if !strings.Contains(events.String(), `"mode":"lastfleet"`) {
 		t.Fatalf("the staged battle was not announced: %s", events.String())
 	}
@@ -64,7 +72,11 @@ func TestControlPlaneReportsTheResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSkirmish: %v", err)
 	}
-	// Decide it by hand: kill everything, then let the meta loop notice.
+	// Stage the opening battle, then decide it by hand: one faction left
+	// standing, and the meta loop notices on the next step.
+	for range stageStableTicks + 1 {
+		g.stepSkirmishMeta()
+	}
 	g.arrivals = nil
 	g.entities = []entity{{kind: kindEnemy, id: 1, hp: 3, faction: 1}}
 	g.match.recordKill(1, 2)

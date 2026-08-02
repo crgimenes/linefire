@@ -230,9 +230,14 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 	}
 	g.trace = newBattleTrace(opts.Events)
 	g.ctrl = &controlInbox{}
-	g.enterCredits() // the autonomous arena; a real match replaces the horde's drip with its fleets
-	g.dealFleets()
-	g.emitBattleEvent()
+	// The aquarium starts flowing at once; a real match waits for the window
+	// to settle into its size before its opening battle is staged (see
+	// stageWhenViewSettles).
+	g.enterCredits()
+	if g.match.Mode == MatchEndless {
+		g.match.staged = true
+		g.emitBattleEvent()
+	}
 	g.floodView = false
 	g.debugHUD = opts.Debug
 	return g, nil
