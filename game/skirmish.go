@@ -135,7 +135,7 @@ const (
 type SkirmishOptions struct {
 	Sound    bool   // create the audio context (default silent)
 	Debug    bool   // show the debug HUD (there is no F3 to toggle it: skirmish reads no keys)
-	Factions int    // teams sharing the arena, clamped to 2..maxFactions (0 = 2)
+	Factions int    // teams sharing the arena, clamped to 1..maxFactions (0 = 2; one is solo practice)
 	Map      string // SkirmishMapArena (default) or SkirmishMapMaze
 
 	// The match being fought (see match.go): MatchEndless (default) is the
@@ -195,7 +195,13 @@ func NewSkirmish(content fs.FS, mapDir string, opts SkirmishOptions) (*Game, err
 	g.skirmishMode = true // set before enterCredits, which builds the arena from it
 	g.transparent = true
 	g.arenaCam = true
-	g.factions = min(max(opts.Factions, 2), maxFactions)
+	// One faction is a legitimate setup — a fleet flying alone, which is how a
+	// program is watched without an opponent — but an UNSET count still means
+	// the usual two.
+	g.factions = 2
+	if opts.Factions > 0 {
+		g.factions = min(opts.Factions, maxFactions)
+	}
 	switch opts.Map {
 	case "", SkirmishMapArena:
 		g.skirmishMap = SkirmishMapArena

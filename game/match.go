@@ -20,7 +20,8 @@ import (
 //	               reads them — and survive arena regenerations.
 //	MatchLastFleet annihilation: each faction lands one fleet, no
 //	               reinforcements, the last faction with ships on the field
-//	               (or in a vortex) prevails.
+//	               (or in a vortex) prevails. A single faction is solo
+//	               practice — there is nobody to annihilate, so it flies on.
 //	MatchTimed     a deadline: fleets land, no reinforcements, and when time
 //	               runs out the most kills prevail (a wipe still ends it
 //	               early). A dead-even score is a draw.
@@ -47,6 +48,7 @@ type Match struct {
 	Mode     string
 	Ships    int // fleet size per faction (lastfleet/timed)
 	Duration int // deadline in ticks (timed)
+	Factions int // teams dealt in: one is solo practice, with nobody to annihilate
 
 	tick     int
 	over     bool
@@ -84,7 +86,7 @@ func newMatch(mode string, ships, duration, factions int) (*Match, error) {
 	if duration <= 0 {
 		duration = battleDefaultTicks
 	}
-	m := &Match{Mode: mode, Ships: ships, Duration: duration, Stats: map[int]*FleetStats{}}
+	m := &Match{Mode: mode, Ships: ships, Duration: duration, Factions: factions, Stats: map[int]*FleetStats{}}
 	for f := 1; f <= factions; f++ {
 		m.Stats[f] = &FleetStats{}
 	}
@@ -139,7 +141,9 @@ func (m *Match) step(present, lastAlive int) {
 	}
 	m.tick++
 	switch {
-	case present <= 1:
+	case present == 0:
+		m.winner, m.over = 0, true // mutual destruction: nobody prevails
+	case present == 1 && m.Factions > 1:
 		m.winner, m.over = lastAlive, true // annihilation ends any mode early
 	case m.Mode == MatchTimed && m.tick >= m.Duration:
 		m.winner, m.over = m.topKills(), true

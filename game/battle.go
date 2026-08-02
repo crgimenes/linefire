@@ -82,7 +82,10 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 	g := newWithContent(content, player, lvl, mapDir, false)
 	g.skirmishMode = true
 	g.arenaCam = true
-	g.factions = min(max(opts.Factions, 2), maxFactions)
+	g.factions = 2 // unset means the usual two; one is a legitimate solo run
+	if opts.Factions > 0 {
+		g.factions = min(opts.Factions, maxFactions)
+	}
 	// #nosec G404 -- deterministic battle simulation, not a security boundary
 	g.simRand = rand.New(rand.NewPCG(uint64(opts.Seed), 0x53494d)) // stream = "SIM"
 	g.trace = newBattleTrace(opts.Trace)

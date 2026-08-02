@@ -29,6 +29,24 @@ func TestEndlessNeverEnds(t *testing.T) {
 	}
 }
 
+// A single faction is solo practice: there is nobody to annihilate, so the
+// battle flies on instead of declaring a winner on the first tick. It ends
+// only if that fleet somehow ceases to exist.
+func TestSoloPracticeDoesNotEndOnItsOwn(t *testing.T) {
+	m, _ := newMatch(MatchLastFleet, 4, 0, 1)
+	for range 600 {
+		m.step(1, 1)
+	}
+	if _, over := m.Over(); over {
+		t.Fatal("a lone fleet has nobody to defeat: the battle should not end")
+	}
+	m.step(0, 0)
+	winner, over := m.Over()
+	if !over || winner != 0 {
+		t.Fatalf("an empty field is a draw, got winner=%d over=%v", winner, over)
+	}
+}
+
 // Lastfleet is annihilation: it ends exactly when one faction remains — and a
 // fleet's last hull still inside its vortex has not lost yet.
 func TestLastFleetEndsOnAnnihilation(t *testing.T) {
