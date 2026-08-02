@@ -33,6 +33,10 @@ import (
 //	self-speed           this hull's movement speed, world units per tick
 //	self-radar           sensor radius, world units
 //	fire-ready           #t when the gun is off cooldown
+//	self-nav-blocked     #t when the last (seek) had no route at all — the
+//	                     point is inside rock, or walled off from here. The
+//	                     ship is patrolling instead of pressing; pick another
+//	                     destination. See (seek) below.
 //	field-w field-h      arena size, world units
 //	tick                 the engine's frame counter
 //	first-tick           #t only on this ship's first run: the whole program
@@ -78,6 +82,14 @@ import (
 //	               presses blindly into a wall, (seek) goes around it. One
 //	               navigation order per tick — (seek) or (move), the last call
 //	               wins. Returns #t.
+//
+//	               Some points cannot be reached at all: a maze puts plenty of
+//	               them INSIDE the rock. The engine will not grind the hull
+//	               into a wall over it — it patrols instead and raises
+//	               self-nav-blocked, so a program that keeps seeking a wall
+//	               keeps a wandering ship rather than a parked one. Reading
+//	               that flag and choosing somewhere else is the fix; the
+//	               engine only refuses to lie about it.
 //	(face deg)     aim the hull; the turn rate is the engine's. Without it the
 //	               hull faces its movement. Returns #t.
 //	(fire x y)     shoot at a world point. Lands only if fire-ready (the
@@ -348,6 +360,7 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	mem["self-hull-max"] = filo.VNum(float64(e.hullMax()))
 	mem["self-weapon"] = filo.VString(e.weaponKey)
 	mem["fire-ready"] = filo.VBool(e.fireCD <= 0)
+	mem["self-nav-blocked"] = filo.VBool(e.navBlocked)
 	mem["field-w"] = filo.VNum(g.bounds.w())
 	mem["field-h"] = filo.VNum(g.bounds.h())
 	mem["tick"] = filo.VNum(float64(g.currentTick()))

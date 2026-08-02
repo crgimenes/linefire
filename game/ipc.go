@@ -89,23 +89,27 @@ type ipcContact struct {
 }
 
 type ipcShipState struct {
-	ID        int          `json:"id"`
-	Kind      string       `json:"kind"`
-	X         float64      `json:"x"`
-	Y         float64      `json:"y"`
-	VX        float64      `json:"vx"`
-	VY        float64      `json:"vy"`
-	Heading   float64      `json:"heading"`
-	Hull      int          `json:"hull"`
-	HullMax   int          `json:"hullMax"`
-	Shield    int          `json:"shield"`
-	Weapon    string       `json:"weapon"` // "" = the hull's own bolt; see shiparms.go
-	Speed     float64      `json:"speed"`
-	Radar     float64      `json:"radar"`
-	FireReady bool         `json:"fireReady"`
-	Allies    []ipcContact `json:"allies"`
-	Enemies   []ipcContact `json:"enemies"`
-	Loot      []ipcContact `json:"loot"` // pickups in sight; Heading is meaningless for these
+	ID        int     `json:"id"`
+	Kind      string  `json:"kind"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	VX        float64 `json:"vx"`
+	VY        float64 `json:"vy"`
+	Heading   float64 `json:"heading"`
+	Hull      int     `json:"hull"`
+	HullMax   int     `json:"hullMax"`
+	Shield    int     `json:"shield"`
+	Weapon    string  `json:"weapon"` // "" = the hull's own bolt; see shiparms.go
+	Speed     float64 `json:"speed"`
+	Radar     float64 `json:"radar"`
+	FireReady bool    `json:"fireReady"`
+	// NavBlocked reports that the last seek had no route at all — the point is
+	// inside rock, or walled off from here. The ship patrols instead of
+	// grinding into the wall; send it somewhere it can reach. See pilot.go.
+	NavBlocked bool         `json:"navBlocked"`
+	Allies     []ipcContact `json:"allies"`
+	Enemies    []ipcContact `json:"enemies"`
+	Loot       []ipcContact `json:"loot"` // pickups in sight; Heading is meaningless for these
 }
 
 type ipcStateMsg struct {
@@ -263,10 +267,11 @@ func (g *Game) ipcShipState(e *entity) ipcShipState {
 		X: e.x, Y: e.y, VX: e.vx, VY: e.vy,
 		Heading: e.angle, Hull: e.hp, HullMax: e.hullMax(), Shield: e.shield, Weapon: e.weaponKey,
 		Speed: e.moveSpeed(), Radar: e.detectRange(),
-		FireReady: e.fireCD <= 0,
-		Allies:    ipcContacts(allies),
-		Enemies:   ipcContacts(enemies),
-		Loot:      ipcContacts(g.lootContacts(e)),
+		FireReady:  e.fireCD <= 0,
+		NavBlocked: e.navBlocked,
+		Allies:     ipcContacts(allies),
+		Enemies:    ipcContacts(enemies),
+		Loot:       ipcContacts(g.lootContacts(e)),
 	}
 }
 

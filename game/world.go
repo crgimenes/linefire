@@ -65,6 +65,8 @@ type entity struct {
 	rateMod    int
 	fireMod    int
 	weaponKey  string     // salvaged weapon ("" = the archetype bolt); see shiparms.go
+	navBlocked bool       // last navigation order had no route: the engine could not deliver
+	holdBreak  int        // frames left giving up the standoff hold after wedging in a corner
 	pilot      *shipPilot // skirmish: the Filo program flying this hull (nil = house brain)
 	a          *asset.Asset
 	mesh       *render.Mesh // nil if the asset is missing
@@ -99,6 +101,7 @@ const (
 	repathInterval    = 18                // frames between A* recomputations while pursuing
 	stuckEps          = 0.3               // movement below this per frame counts as no progress
 	stuckLimit        = 8                 // frames of no progress before forcing an unstick
+	holdBreakFrames   = 60                // how long a wedged ship stops holding station and repositions instead
 	velSmooth         = 0.25              // how fast the steering velocity follows the target (inertia)
 	enemyTurnRate     = 8.0               // max degrees the enemy turns per frame (no snap-spinning)
 
@@ -302,6 +305,13 @@ func (g *Game) pursuePath(e *entity, tx, ty float64) {
 		e.path = g.nav.findPath(e.x, e.y, tx, ty)
 		e.pathStep = 0
 		e.repathCD = repathInterval
+		// A search that came back with NOTHING, over a line that is not clear
+		// either, means there is no way there at all: the point is inside rock,
+		// or walled off from here. That is decided HERE, at the search, and not
+		// from an exhausted path — a path runs out on every normal approach,
+		// and reading that as "unreachable" makes a ship abandon a route it
+		// was walking perfectly well.
+		e.navBlocked = len(e.path) == 0 && !g.clearPath(e.x, e.y, tx, ty, e.radius)
 	}
 
 	// Drop waypoints already reached, then smooth: skip ahead to the furthest one
@@ -317,8 +327,26 @@ func (g *Game) pursuePath(e *entity, tx, ty float64) {
 	if e.pathStep < len(e.path) {
 		wp := e.path[e.pathStep]
 		g.steerToward(e, wp.x, wp.y)
-	} else {
+		return
+	}
+	// The path ran out. Heading straight is exactly right when the way is
+	// CLEAR: the last leg of an approach, or a target sitting in the open.
+	if !e.navBlocked && g.clearPath(e.x, e.y, tx, ty, e.radius) {
 		g.steerToward(e, tx, ty)
+		return
+	}
+	// Otherwise rock stands between here and the point — either no route was
+	// ever found, or the route is spent and the rest is wall. Pressing gains
+	// nothing but a ground-down hull, and findPath makes that easy to walk
+	// into: a goal INSIDE rock is snapped to the nearest free cell, so a path
+	// DOES come back, the hull walks to the rock face, and from there the raw
+	// target keeps pulling it in. That is how four hulls of one fleet came to
+	// be parked shoulder to shoulder in the same corner for a whole battle.
+	//
+	// A ship the engine cannot deliver is still a ship: it patrols, staying in
+	// the battle instead of becoming a fixture on a wall.
+	if !e.stationary {
+		g.patrol(e)
 	}
 }
 
@@ -539,6 +567,16 @@ func (g *Game) moveEnemyEngaged(e *entity, tx, ty, dist float64, los bool) {
 		sd = enemyStandoff
 	}
 	holding := g.shouldHold(tx, ty, dist, sd, los)
+	// A hull pinned in a corner cannot orbit out of it: both tangents are rock,
+	// and flipping the orbit direction only trades one wall for the other. So a
+	// hold that has wedged is GIVEN UP for a moment — pursuePath repositions it
+	// with the A* that already knows the way around — and then resumes. Without
+	// this a ship sat perfectly still in a corner for five seconds, shooting,
+	// while an enemy closed in and killed it.
+	if e.holdBreak > 0 {
+		e.holdBreak--
+		holding = false
+	}
 
 	bx, by := e.x, e.y
 	if holding {
@@ -562,6 +600,9 @@ func (g *Game) moveEnemyEngaged(e *entity, tx, ty, dist float64, los bool) {
 		if e.stuck >= stuckLimit {
 			g.unstick(e, tx, ty)
 			e.stuck = 0
+			if holding {
+				e.holdBreak = holdBreakFrames // the corner wins the orbit; take the path out
+			}
 		}
 	} else {
 		e.stuck = 0
