@@ -129,6 +129,8 @@ func RunBattle(content fs.FS, mapDir string, opts BattleOptions) (BattleResult, 
 		g.simTick = tick
 		g.updateEnemies()
 		g.stepEnemyShots()
+		g.resolveSalvage()   // the same systems Update steps: a headless battle
+		g.stepSalvageDrops() // is the same battle, or it measures a different game
 		if tick%snapEvery == 0 {
 			g.traceSnapshot(last)
 		}

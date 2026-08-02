@@ -208,7 +208,7 @@ func (g *Game) enemyEntity(kind string, a *asset.Asset, mesh, glow *render.Mesh,
 	return entity{
 		kind: kindEnemy, align: alignBad, x: x, y: y, angle: angle,
 		id: g.entitySeq,
-		hp: arch.HP, radar: arch.Radar,
+		hp: arch.HP, hpMax: arch.HP, radar: arch.Radar,
 		stationary: arch.Stationary, fireEvery: arch.FireEvery,
 		shotDmg: arch.ShotDamage, shotSpeed: arch.ShotSpeed, speedMul: arch.SpeedMul,
 		a: a, mesh: mesh, glowMesh: glow, radius: assetRadius(a),

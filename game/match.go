@@ -40,7 +40,7 @@ type FleetStats struct {
 	Kills    int // enemy ships destroyed
 	Losses   int // own ships destroyed
 	Shots    int // bolts fired (with Kills, an accuracy read)
-	Powerups int // reserved: ships cannot collect loot yet (the Filo loop will)
+	Powerups int // pickups salvaged off the battlefield (see salvage.go)
 }
 
 // Match is the battle being fought: its rules, its clock and its scoreboard.
@@ -112,6 +112,12 @@ func (m *Match) stats(faction int) *FleetStats {
 func (m *Match) recordShot(faction int) {
 	if s := m.stats(faction); s != nil {
 		s.Shots++
+	}
+}
+
+func (m *Match) recordSalvage(faction int) {
+	if s := m.stats(faction); s != nil {
+		s.Powerups++
 	}
 }
 

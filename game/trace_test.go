@@ -108,3 +108,43 @@ func TestCheckTraceCatchesPlantedViolations(t *testing.T) {
 		}
 	}
 }
+
+// A repair is a legitimate way for a hull to rise, and a shield absorbing a
+// hit is a legitimate way for one not to move. The checker has to tell those
+// from corruption, or salvage would make every real trace look broken.
+func TestCheckTraceAcceptsRepairsAndShields(t *testing.T) {
+	trace := strings.Join([]string{
+		`{"ev":"battle","n":1,"seed":1,"w":1000,"h":1000,"factions":2,"ships":1}`,
+		`{"t":10,"ev":"spawn","id":1,"f":1,"kind":"enemy","x":100,"y":100,"hp":4}`,
+		`{"t":10,"ev":"spawn","id":2,"f":2,"kind":"enemy","x":900,"y":900,"hp":4}`,
+		`{"t":20,"ev":"hit","id":1,"f":1,"by":2,"dmg":2,"x":100,"y":100,"hp":2}`,
+		`{"t":30,"ev":"salvage","id":1,"f":1,"kind":"heal","x":100,"y":100,"hp":4}`, // repaired
+		`{"t":60,"ev":"snap","id":1,"f":1,"x":140,"y":100,"hp":4,"mv":40}`,          // the rise is explained
+		`{"t":70,"ev":"hit","id":1,"f":1,"by":2,"dmg":0,"x":140,"y":100,"hp":4}`,    // a shield held
+		`{"ev":"result","winner":0,"ticks":70,"alive":{"1":1,"2":1}}`,
+	}, "\n")
+
+	finds, err := CheckTrace(strings.NewReader(trace))
+	if err != nil {
+		t.Fatalf("CheckTrace: %v", err)
+	}
+	if len(finds) != 0 {
+		t.Fatalf("a repaired and shielded ship is not corruption: %v", finds)
+	}
+
+	// The same rise with nothing salvaged IS corruption.
+	broken := strings.ReplaceAll(trace, `{"t":30,"ev":"salvage","id":1,"f":1,"kind":"heal","x":100,"y":100,"hp":4}`+"\n", "")
+	finds, err = CheckTrace(strings.NewReader(broken))
+	if err != nil {
+		t.Fatalf("CheckTrace: %v", err)
+	}
+	found := false
+	for _, f := range finds {
+		if strings.Contains(f, "nothing salvaged") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("an unexplained hull rise should still be caught; findings: %v", finds)
+	}
+}

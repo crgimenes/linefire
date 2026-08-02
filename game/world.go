@@ -34,31 +34,36 @@ type entity struct {
 	x, y       float64
 	angle      float64
 	radius     float64
-	vx, vy     float64    // current steering velocity (smoothed, to damp jitter at corners)
-	power      string     // power-up effect, or the weapon key (front/turret/...) for kindWeapon
-	target     string     // portal destination "map" or "map:label" (kindPortal only)
-	inside     bool       // player currently overlaps (kindWeapon: swap fires once per entry)
-	spawn      int        // index into level.Spawns this came from (per-map persistence)
-	hp         int        // remaining hits before the enemy is destroyed (0 for power-ups)
-	fireCD     int        // frames until this enemy can fire again
-	hitFlash   int        // frames the white impact flash still shows
-	radar      float64    // current engage range; grows when the enemy is hit
-	stationary bool       // turret archetype: never moves, only faces and fires
-	boss       bool       // shielded (invulnerable) until every non-boss enemy on the map is dead
-	fireEvery  int        // archetype fire interval (frames between shots; <=0 = baseline)
-	shotDmg    int        // archetype damage per shot to the player
-	shotSpeed  float64    // archetype projectile speed
-	speedMul   float64    // archetype movement-speed multiplier (1 = baseline)
-	orbitDir   float64    // +1 / -1: which way it circles the player
-	combat     bool       // alerted: tracks the player through walls until they leave the radar
-	standoff   float64    // preferred orbit distance (randomized per enemy so they spread out)
-	path       []vec2     // A* waypoints toward the player when out of line of sight
-	pathStep   int        // index of the next waypoint
-	repathCD   int        // frames until the path is recomputed
-	stuck      int        // frames of no progress while pursuing (triggers an unstick)
-	wanderHead float64    // current heading while patrolling (radians)
-	wanderCD   int        // frames until the patrol picks a new heading
-	alertGrace int        // frames of combat left after losing the player (before giving up)
+	vx, vy     float64 // current steering velocity (smoothed, to damp jitter at corners)
+	power      string  // power-up effect, or the weapon key (front/turret/...) for kindWeapon
+	target     string  // portal destination "map" or "map:label" (kindPortal only)
+	inside     bool    // player currently overlaps (kindWeapon: swap fires once per entry)
+	spawn      int     // index into level.Spawns this came from (per-map persistence)
+	hp         int     // remaining hits before the enemy is destroyed (0 for power-ups)
+	fireCD     int     // frames until this enemy can fire again
+	hitFlash   int     // frames the white impact flash still shows
+	radar      float64 // current engage range; grows when the enemy is hit
+	stationary bool    // turret archetype: never moves, only faces and fires
+	boss       bool    // shielded (invulnerable) until every non-boss enemy on the map is dead
+	fireEvery  int     // archetype fire interval (frames between shots; <=0 = baseline)
+	shotDmg    int     // archetype damage per shot to the player
+	shotSpeed  float64 // archetype projectile speed
+	speedMul   float64 // archetype movement-speed multiplier (1 = baseline)
+	orbitDir   float64 // +1 / -1: which way it circles the player
+	combat     bool    // alerted: tracks the player through walls until they leave the radar
+	standoff   float64 // preferred orbit distance (randomized per enemy so they spread out)
+	path       []vec2  // A* waypoints toward the player when out of line of sight
+	pathStep   int     // index of the next waypoint
+	repathCD   int     // frames until the path is recomputed
+	stuck      int     // frames of no progress while pursuing (triggers an unstick)
+	wanderHead float64 // current heading while patrolling (radians)
+	wanderCD   int     // frames until the patrol picks a new heading
+	alertGrace int     // frames of combat left after losing the player (before giving up)
+	hpMax      int     // what this hull was built with; a repair never goes past it
+	shield     int     // salvaged shield: absorbs damage before the hull does
+	dmgMod     int     // salvaged combat mods: harder bolts, shorter interval, wider volley
+	rateMod    int
+	fireMod    int
 	pilot      *shipPilot // skirmish: the Filo program flying this hull (nil = house brain)
 	a          *asset.Asset
 	mesh       *render.Mesh // nil if the asset is missing
@@ -489,16 +494,11 @@ func (g *Game) updateEnemies() {
 			g.moveEnemyEngaged(e, tx, ty, dist, los)
 		}
 
-		// Fire only with a clear line of sight: it cannot shoot through walls. An
-		// unset fire interval (directly-built entities, e.g. tests) uses the baseline.
-		eff := e.fireEvery
-		if eff <= 0 {
-			eff = enemyFireInterval
-		}
+		// Fire only with a clear line of sight: it cannot shoot through walls.
 		if e.fireCD > 0 || !los {
 			continue
 		}
-		e.fireCD = eff
+		e.fireCD = e.fireInterval()
 		g.enemyFire(e, tx, ty)
 	}
 }
@@ -595,13 +595,31 @@ func (g *Game) patrol(e *entity) {
 	e.angle = turnToward(e.angle, target, enemyTurnRate)
 }
 
-// enemyFire spawns one enemy bullet aimed at the target's current position.
+// enemyFire spawns this hull's volley at the target's current position: one
+// bolt, or a narrow fan of them once the ship has salvaged fire mods.
 func (g *Game) enemyFire(e *entity, tx, ty float64) {
 	dx, dy := tx-e.x, ty-e.y
 	d := math.Hypot(dx, dy)
 	if d == 0 {
 		return
 	}
+	aim := math.Atan2(dy, dx)
+	bolts := 1 + e.fireMod
+	spread := shipFanDegrees * math.Pi / 180
+	for i := range bolts {
+		// Centre the fan on the aim: one bolt flies straight, two straddle it.
+		off := (float64(i) - float64(bolts-1)/2) * spread
+		g.fireBolt(e, aim+off, tx, ty)
+	}
+	g.match.recordShot(e.faction)
+	g.traceShot(e, tx, ty)
+	// The enemy's own fire sound, when its asset declares one ("fire" has no
+	// fallback on purpose: a full room of default pew-pew would swamp the mix).
+	g.playEvent(e.a, "fire")
+}
+
+// fireBolt sends one bolt of this hull's volley along a heading in radians.
+func (g *Game) fireBolt(e *entity, heading, tx, ty float64) {
 	speed := e.shotSpeed
 	if speed <= 0 {
 		speed = enemyBulletSpeed
@@ -615,19 +633,15 @@ func (g *Game) enemyFire(e *entity, tx, ty float64) {
 	}
 	g.enemyShots = append(g.enemyShots, projectile{
 		x: e.x, y: e.y, px: e.x, py: e.y,
-		vx:      dx / d * speed,
-		vy:      dy / d * speed,
+		vx:      math.Cos(heading) * speed,
+		vy:      math.Sin(heading) * speed,
 		life:    enemyBulletLife,
 		dmg:     e.shotDmg,
+		hullDmg: shipShotHullDamage + e.dmgMod, // what salvaged damage mods buy
 		faction: e.faction,
 		sid:     e.id,
 		rcol:    rcol, rglow: rglow, width: bulletWidth, glowW: bulletGlowWidth,
 	})
-	g.match.recordShot(e.faction)
-	g.traceShot(e, tx, ty)
-	// The enemy's own fire sound, when its asset declares one ("fire" has no
-	// fallback on purpose: a full room of default pew-pew would swamp the mix).
-	g.playEvent(e.a, "fire")
 }
 
 // detectRange is the enemy's current engage radius, defaulting to the base radar
@@ -650,6 +664,19 @@ func (g *Game) damageEnemy(i, dmg int, col color.RGBA, by int) bool {
 		e.hitFlash = hitFlashFrames
 		g.emitBurst(e.x, e.y, shieldSparks)
 		return false
+	}
+	// A salvaged shield takes the blow first, and a hull behind a shield that
+	// held is not hurt at all.
+	if e.shield > 0 {
+		absorbed := min(e.shield, dmg)
+		e.shield -= absorbed
+		dmg -= absorbed
+		g.emitBurst(e.x, e.y, shieldSparks)
+		if dmg <= 0 {
+			e.hitFlash = hitFlashFrames
+			g.traceHit(e, by, 0)
+			return false
+		}
 	}
 	e.hp -= dmg
 	g.spawnDamageNumber(e.x, e.y-e.radius, dmg, col)

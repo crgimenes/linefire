@@ -106,6 +106,16 @@ func (g *Game) traceDeath(e *entity, by int) {
 		By: by, X: int(e.x), Y: int(e.y)})
 }
 
+// traceSalvage records a ship taking something off the field; kind is what it
+// took, so a trace shows which fleet lived off the battlefield.
+func (g *Game) traceSalvage(e *entity, kind string) {
+	if g.trace == nil {
+		return
+	}
+	g.trace.emit(traceEvent{T: g.currentTick(), Ev: "salvage", ID: e.id, F: e.faction,
+		Kind: kind, X: int(e.x), Y: int(e.y), HP: e.hp})
+}
+
 // traceSnapshot writes one "snap" line per live ship; last carries each ship's
 // position at the previous snapshot so mv (distance covered since) is cheap.
 func (g *Game) traceSnapshot(last map[int][2]float64) {

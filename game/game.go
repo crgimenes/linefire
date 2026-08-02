@@ -207,6 +207,7 @@ type Game struct {
 	entitySeq int           // last ship id dealt; ids are stable for the trace
 	trace     *battleTrace  // battle events as JSONL (headless trace, or the visual control plane); nil = silent
 	ctrl      *controlInbox // skirmish: the control plane's command mailbox (see control.go)
+	salvageCD int           // skirmish: ticks until the field produces another pickup
 	arenaSeed int64         // the seed the current arena was generated from
 
 	factionSkins    map[factionSkinKey]hordeAsset // skirmish: per-(kind, faction) retinted meshes
@@ -775,6 +776,8 @@ func (g *Game) Update() error {
 	}
 	g.energyPool().Tick() // the slow trickle back; a pickup is what refills it properly
 	g.stepArrivals()      // vortices land the ships they were opened for (skirmish)
+	g.resolveSalvage()    // skirmish: ships collect what the battle leaves lying about
+	g.stepSalvageDrops()  // skirmish: and the field keeps producing more
 	g.stepProjectiles()
 	g.stepAllies()
 	g.updateEnemies()

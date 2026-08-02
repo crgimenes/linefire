@@ -39,10 +39,19 @@ import (
 //	                     re-runs every tick, so unconditional (def n 0) would
 //	                     reset n each time — guard memory initialisation with
 //	                     (if first-tick (def n 0))
+//	self-shield          salvaged shield: it absorbs damage before the hull
+//	self-hull-max        what this hull was built with, so a program can tell
+//	                     a scratch from a wreck and decide to go for a repair
 //	allies enemies       lists of VISIBLE contacts — inside self-radar AND in
 //	                     line of sight (rock hides what is behind it) — sorted
 //	                     nearest first. Each contact is a list of five values:
 //	                     (kind x y heading dist).
+//	loot                 pickups the ship can see, same rules, nearest first:
+//	                     (kind x y dist), where kind is "heal", "shield",
+//	                     "fire", "rate", "damage" or a weapon key. Salvaging
+//	                     one is a matter of flying over it (see salvage.go),
+//	                     so a program that wants it just seeks it — and so
+//	                     does the enemy program.
 //
 // Orders (builtins; the last call of each wins; physics stays the engine's —
 // a program steers a ship, it does not teleport one):
@@ -301,11 +310,7 @@ func (g *Game) applyShipOrders(e *entity, orders *pilotOrders) {
 		e.angle = turnToward(e.angle, orders.faceDeg, enemyTurnRate)
 	}
 	if orders.hasFire && e.fireCD <= 0 {
-		eff := e.fireEvery
-		if eff <= 0 {
-			eff = enemyFireInterval
-		}
-		e.fireCD = eff
+		e.fireCD = e.fireInterval()
 		g.enemyFire(e, orders.fireX, orders.fireY)
 	}
 }
@@ -323,6 +328,8 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	mem["self-faction"] = filo.VNum(float64(e.faction))
 	mem["self-speed"] = filo.VNum(e.moveSpeed())
 	mem["self-radar"] = filo.VNum(e.detectRange())
+	mem["self-shield"] = filo.VNum(float64(e.shield))
+	mem["self-hull-max"] = filo.VNum(float64(e.hullMax()))
 	mem["fire-ready"] = filo.VBool(e.fireCD <= 0)
 	mem["field-w"] = filo.VNum(g.bounds.w())
 	mem["field-h"] = filo.VNum(g.bounds.h())
@@ -331,6 +338,22 @@ func (g *Game) fillInstruments(e *entity, mem map[string]filo.Value) {
 	allies, enemies := g.sensorContacts(e)
 	mem["allies"] = filo.VList(contactsToFilo(allies))
 	mem["enemies"] = filo.VList(contactsToFilo(enemies))
+	mem["loot"] = filo.VList(lootToFilo(g.lootContacts(e)))
+}
+
+// lootToFilo encodes visible pickups as four-slot lists: a canister has no
+// heading to report, so it carries one field fewer than a ship.
+func lootToFilo(cs []contact) []filo.Value {
+	out := make([]filo.Value, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, filo.VList([]filo.Value{
+			filo.VString(c.kind),
+			filo.VNum(c.x),
+			filo.VNum(c.y),
+			filo.VNum(c.dist),
+		}))
+	}
+	return out
 }
 
 // contactsToFilo encodes contacts as the contract's five-slot lists.
@@ -409,4 +432,25 @@ func (g *Game) sensorContacts(e *entity) (allies, enemies []contact) {
 		}
 	}
 	return allies, enemies
+}
+
+// lootContacts is the pickups this ship can see, under the same rules its
+// sensors use for ships: inside the radar and not behind rock, nearest first.
+// Loot a program cannot see is loot it cannot race anyone for.
+func (g *Game) lootContacts(e *entity) []contact {
+	var seen []contact
+	radar := e.detectRange()
+	for i := range g.entities {
+		o := &g.entities[i]
+		if o.kind != kindPowerUp && o.kind != kindWeapon {
+			continue
+		}
+		d := math.Hypot(o.x-e.x, o.y-e.y)
+		if d > radar || !g.lineOfSight(e.x, e.y, o.x, o.y) {
+			continue
+		}
+		seen = append(seen, contact{kind: o.power, x: o.x, y: o.y, dist: d})
+	}
+	sort.Slice(seen, func(i, j int) bool { return seen[i].dist < seen[j].dist })
+	return seen
 }

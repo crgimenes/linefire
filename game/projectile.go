@@ -82,6 +82,7 @@ type projectile struct {
 	seek    float64    // homing turn rate, radians/frame (0 = flies straight)
 	faction int        // the shooter's team (enemy shots): its own kind is never hit
 	sid     int        // the shooter's ship id (enemy shots), for the battle trace
+	hullDmg int        // hull damage this bolt does to another SHIP (raised by salvaged damage mods)
 
 	rcol  color.RGBA // core render color (per-weapon, so one pool draws every shot)
 	rglow color.RGBA // glow render color
@@ -252,11 +253,12 @@ func (g *Game) stepEnemyShots() {
 		// own fire keeps passing through its own kind, exactly as before.
 		if hit := g.bulletHitsFoe(p.px, p.py, nx, ny, p.faction); hit >= 0 {
 			victim := g.entities[hit].faction
-			if g.damageEnemy(hit, shipShotHullDamage, p.rglow, p.sid) {
+			hull := max(p.hullDmg, shipShotHullDamage) // a directly-built shot (tests) hits for the baseline
+			if g.damageEnemy(hit, hull, p.rglow, p.sid) {
 				g.match.recordKill(p.faction, victim)
 			}
 			q := p
-			q.dmg = shipShotHullDamage // sparks scale with the hull damage dealt, not the player-unit payload
+			q.dmg = hull // sparks scale with the hull damage dealt, not the player-unit payload
 			g.impactBurst(nx, ny, &q, true)
 			continue
 		}

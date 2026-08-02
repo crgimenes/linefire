@@ -16,7 +16,10 @@ import (
 // Invariants checked:
 //
 //   - every position (spawn, snap, hit, death) lies inside the arena;
-//   - a ship's hull only ever goes down, and only hits move it;
+//   - a ship's hull falls only through hits, and rises only after it has
+//     salvaged something — a repair is legitimate, an unexplained recovery is
+//     not. A hit that leaves the hull untouched is a shield absorbing it, and
+//     says so by reporting no damage;
 //   - nothing happens to a ship after its death, and nobody is hit or killed
 //     by a ship that never existed (a shooter may die while its bolt flies,
 //     so a dead "by" is legal — an unborn one is not);
@@ -94,6 +97,7 @@ type traceShipState struct {
 	dead     bool
 	stalled  int  // consecutive low-movement snapshots
 	reported bool // one stall finding per ship, not one per snapshot
+	salvaged bool // took something since the last snapshot: a hull rise is explained
 }
 
 type traceState struct {
@@ -160,15 +164,16 @@ func (st *traceState) checkEvent(battle int, ev traceCheckEvent) []string {
 			find("hit on ship %d, which never spawned", ev.ID)
 			return finds
 		}
+		finds = append(finds, st.checkHit(battle, ev, s)...)
+	case "salvage":
+		if s == nil {
+			find("salvage by ship %d, which never spawned", ev.ID)
+			return finds
+		}
 		if s.dead {
-			find("hit on ship %d, which is dead", ev.ID)
+			find("salvage by ship %d, which is dead", ev.ID)
 		}
-		if ev.By != 0 && st.ships[ev.By] == nil {
-			find("ship %d hit by ship %d, which never spawned", ev.ID, ev.By)
-		}
-		if ev.HP >= s.hp {
-			find("hit on ship %d RAISED its hull: %d -> %d", ev.ID, s.hp, ev.HP)
-		}
+		s.salvaged = true // whatever it took explains a hull rise at the next reading
 		s.hp = ev.HP
 	case "death":
 		if s == nil {
@@ -191,10 +196,10 @@ func (st *traceState) checkEvent(battle int, ev traceCheckEvent) []string {
 		if s.dead {
 			find("snapshot of ship %d, which is dead", ev.ID)
 		}
-		if ev.HP > s.hp {
-			find("ship %d's hull ROSE between snapshots: %d -> %d", ev.ID, s.hp, ev.HP)
+		if ev.HP > s.hp && !s.salvaged {
+			find("ship %d's hull ROSE between snapshots with nothing salvaged: %d -> %d", ev.ID, s.hp, ev.HP)
 		}
-		s.hp = ev.HP
+		s.hp, s.salvaged = ev.HP, false
 		if ev.Mv < stallEps && st.foesAlive() {
 			s.stalled++
 			if s.stalled >= stallSnaps && !s.reported {
@@ -206,6 +211,32 @@ func (st *traceState) checkEvent(battle int, ev traceCheckEvent) []string {
 			s.stalled = 0
 		}
 	}
+	return finds
+}
+
+// checkHit audits one landed hit: it must come from a ship that existed, must
+// not raise a hull, and must move the hull by exactly as much as it claims —
+// unless it claims nothing, which is how a shield absorbing it reports.
+func (st *traceState) checkHit(battle int, ev traceCheckEvent, s *traceShipState) []string {
+	var finds []string
+	find := func(format string, args ...any) {
+		finds = append(finds, fmt.Sprintf("battle %d t=%d: ", battle, ev.T)+fmt.Sprintf(format, args...))
+	}
+	if s.dead {
+		find("hit on ship %d, which is dead", ev.ID)
+	}
+	if ev.By != 0 && st.ships[ev.By] == nil {
+		find("ship %d hit by ship %d, which never spawned", ev.ID, ev.By)
+	}
+	switch {
+	case ev.HP > s.hp:
+		find("hit on ship %d RAISED its hull: %d -> %d", ev.ID, s.hp, ev.HP)
+	case ev.Dmg == 0 && ev.HP != s.hp:
+		find("hit on ship %d did no damage but moved its hull: %d -> %d", ev.ID, s.hp, ev.HP)
+	case ev.Dmg > 0 && ev.HP == s.hp:
+		find("hit on ship %d did %d damage but left its hull at %d", ev.ID, ev.Dmg, s.hp)
+	}
+	s.hp = ev.HP
 	return finds
 }
 

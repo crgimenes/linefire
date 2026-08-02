@@ -22,9 +22,10 @@ import (
 //
 //	{"tick":420,"field":{"w":2400,"h":1600},"ships":[
 //	  {"id":7,"kind":"tank","x":812,"y":400,"vx":0.4,"vy":-1.1,
-//	   "heading":-12.5,"hull":9,"speed":1.1,"radar":320,"fireReady":true,
+//	   "heading":-12.5,"hull":9,"hullMax":10,"shield":3,
+//	   "speed":1.1,"radar":320,"fireReady":true,
 //	   "allies":[{"kind":"enemy","x":700,"y":380,"heading":10,"dist":114}],
-//	   "enemies":[...]}]}
+//	   "enemies":[...],"loot":[{"kind":"shield","x":900,"y":420,"dist":90}]}]}
 //
 // Driver -> engine, whenever it wants — the engine NEVER waits for it. Each
 // order is STANDING: it holds until replaced or cleared, which is what lets a
@@ -90,11 +91,14 @@ type ipcShipState struct {
 	VY        float64      `json:"vy"`
 	Heading   float64      `json:"heading"`
 	Hull      int          `json:"hull"`
+	HullMax   int          `json:"hullMax"`
+	Shield    int          `json:"shield"`
 	Speed     float64      `json:"speed"`
 	Radar     float64      `json:"radar"`
 	FireReady bool         `json:"fireReady"`
 	Allies    []ipcContact `json:"allies"`
 	Enemies   []ipcContact `json:"enemies"`
+	Loot      []ipcContact `json:"loot"` // pickups in sight; Heading is meaningless for these
 }
 
 type ipcStateMsg struct {
@@ -250,11 +254,12 @@ func (g *Game) ipcShipState(e *entity) ipcShipState {
 	return ipcShipState{
 		ID: e.id, Kind: e.kindName(),
 		X: e.x, Y: e.y, VX: e.vx, VY: e.vy,
-		Heading: e.angle, Hull: e.hp,
+		Heading: e.angle, Hull: e.hp, HullMax: e.hullMax(), Shield: e.shield,
 		Speed: e.moveSpeed(), Radar: e.detectRange(),
 		FireReady: e.fireCD <= 0,
 		Allies:    ipcContacts(allies),
 		Enemies:   ipcContacts(enemies),
+		Loot:      ipcContacts(g.lootContacts(e)),
 	}
 }
 
