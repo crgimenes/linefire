@@ -98,6 +98,12 @@ func factionColor(f int) color.RGBA {
 	return factionPalette[(f-1)%maxFactions]
 }
 
+// FactionColor is the same team color, for anything OUTSIDE the engine that
+// has to agree with the battlefield — a launcher's fleet list, an application
+// icon. Colour says which faction here, so a second copy of this palette
+// somewhere else is a divergence waiting to happen.
+func FactionColor(f int) color.RGBA { return factionColor(f) }
+
 // factionShotColors is the faction's bolt: the same hot-core/colored-halo
 // relationship the horde's orange shot has, in the faction's hue.
 func factionShotColors(f int) (core, glow color.RGBA) {
