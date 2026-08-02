@@ -154,3 +154,46 @@ func TestIPCDeadDriverFallsBack(t *testing.T) {
 		t.Fatal("the abandoned ship should at least patrol")
 	}
 }
+
+// The death is ANNOUNCED on the control stream, once. A garage that only sees
+// stderr shows a fleet quietly flying the house brain and nothing else: the
+// user's agent crashed and the game looks like it ignored them.
+func TestIPCDeadDriverIsAnnouncedOnce(t *testing.T) {
+	g, orders, _ := ipcGame(t)
+	d := g.ipcDrivers[1]
+	var events strings.Builder
+	g.trace = newBattleTrace(&events)
+
+	_ = orders.Close()
+	for range 200 {
+		d.mu.Lock()
+		dead := d.dead
+		d.mu.Unlock()
+		if dead {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	for range 30 {
+		g.updateEnemies()
+	}
+	got := events.String()
+	if strings.Count(got, `"ev":"driver"`) != 1 {
+		t.Fatalf("want exactly one driver event over 30 ticks, got: %s", got)
+	}
+	if !strings.Contains(got, `"f":1`) || !strings.Contains(got, "closed its stream") {
+		t.Fatalf("the event must name the faction and what happened: %s", got)
+	}
+
+	// It is a control-plane note, not a battle fact: the checker must not read
+	// its absent coordinates as a ship at 0,0 outside the arena.
+	finds, err := CheckTrace(strings.NewReader(
+		`{"ev":"battle","n":1,"w":1000,"h":1000}` + "\n" + got))
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if len(finds) != 0 {
+		t.Fatalf("the checker flagged a control-plane note: %v", finds)
+	}
+}

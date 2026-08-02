@@ -51,6 +51,11 @@ func CheckTrace(r io.Reader) ([]string, error) {
 			st.w, st.h = float64(ev.W), float64(ev.H)
 		case "result":
 			finds = append(finds, st.checkResult(battle, ev)...)
+		case "driver":
+			// A control-plane note (an external driver died), not a battle
+			// fact: it carries no ship and no position, so the per-event
+			// checks below would read its absent coordinates as 0,0 and
+			// report a perfectly healthy battle as out of bounds.
 		default:
 			finds = append(finds, st.checkEvent(battle, ev)...)
 		}

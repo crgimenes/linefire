@@ -214,6 +214,7 @@ func (g *Game) runIPCShip(d *IPCDriver, e *entity) bool {
 	if dead {
 		if !shown {
 			log.Printf("faction %d driver %s (its ships fall back to the house brain)", d.faction, why)
+			g.emitDriverEvent(d.faction, why)
 		}
 		return false
 	}
@@ -224,6 +225,18 @@ func (g *Game) runIPCShip(d *IPCDriver, e *entity) bool {
 	orders := *o // the standing order is shared state; fire mutates cooldowns via e, not via the order
 	g.applyShipOrders(e, &orders)
 	return true
+}
+
+// emitDriverEvent announces on the control stream that a faction's external
+// driver stopped flying it. Without this the fallback is only a line on stderr:
+// a garage user watches a fleet quietly revert to the house brain with no way
+// to tell that their agent crashed, and blames the game. It is a control-plane
+// note, not a battle fact — the trace checker skips it.
+func (g *Game) emitDriverEvent(faction int, why string) {
+	if g.trace == nil {
+		return
+	}
+	g.trace.emit(map[string]any{"ev": "driver", "f": faction, "why": why})
 }
 
 // stepIPC feeds every driver its faction's state at ipcSendEvery cadence.
