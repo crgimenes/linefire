@@ -185,11 +185,14 @@ func (g *Game) stepPlayerShots(shots []projectile) []projectile {
 		}
 		// Pickups are breakable by deliberate player fire (enemies checked first, so
 		// a shot never favors a crate over a threat). No score, no reward shake.
+		// The pickup is chipped BEFORE a warhead detonates: the blast kills,
+		// killing moves g.entities, and the index in hand only names the pickup
+		// while nothing has moved yet.
 		if hit := g.bulletHitsPickup(p.px, p.py, nx, ny); hit >= 0 {
+			g.damagePickup(hit, p.dmg)
 			if p.aoe > 0 {
 				g.explodeAt(nx, ny, p.dmg, p.aoe, p.col)
 			}
-			g.damagePickup(hit, p.dmg)
 			g.impactBurst(nx, ny, &p, false)
 			continue
 		}
@@ -269,6 +272,27 @@ func (g *Game) stepEnemyShots() {
 			q.dmg = hull // sparks scale with the hull damage dealt, not the player-unit payload
 			g.impactBurst(nx, ny, &q, true)
 			continue
+		}
+		// Canisters break under ship fire, exactly as they break under the
+		// player's (hulls checked first, so a bolt never favors a crate over a
+		// threat; chips of pickupHP; a missile detonates on it). SKIRMISH only:
+		// in the campaign, enemy fire leaving pickups alone is the documented
+		// v1 rule — only the player breaks things there, deliberately.
+		// Chip first, detonate second: the blast kills, killing moves
+		// g.entities, and the index only names the pickup while nothing has
+		// moved yet — the reversed order panicked in a real battle.
+		if g.skirmishMode {
+			if hit := g.bulletHitsPickup(p.px, p.py, nx, ny); hit >= 0 {
+				hull := max(p.hullDmg, shipShotHullDamage)
+				g.damagePickup(hit, hull)
+				if p.aoe > 0 {
+					g.shipBlast(nx, ny, p.aoe, p.hullDmg, p.blastSource())
+				}
+				q := p
+				q.dmg = hull
+				g.impactBurst(nx, ny, &q, false)
+				continue
+			}
 		}
 		// The player test: in skirmish there is no player ship to hit — the
 		// autopilot ghost is parked outside the fight and must not soak fire.

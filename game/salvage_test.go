@@ -171,3 +171,99 @@ func TestOnlyWeaponsThatChangeTheHullAreSalvaged(t *testing.T) {
 		t.Fatalf("a weapon on the field should be visible loot, got %+v", loot)
 	}
 }
+
+// Canisters break under ship fire exactly as they break under the player's:
+// chipped per hit, gone at pickupHP, and the bolt is spent on the crate.
+func TestShipFireBreaksACanister(t *testing.T) {
+	g := salvageGame(t)
+	g.entities = append(g.entities, pickup(powerHeal, 700, 500))
+
+	for range pickupHP {
+		g.enemyShots = []projectile{{
+			x: 650, y: 500, px: 650, py: 500, vx: 20, vy: 0, life: 10,
+			faction: 2, sid: 9,
+		}}
+		for range 5 { // let the bolt cover the distance to the crate
+			g.stepEnemyShots()
+		}
+		if len(g.enemyShots) != 0 {
+			t.Fatal("the bolt should be spent on the crate it hit")
+		}
+	}
+	if len(g.entities) != 1 {
+		t.Fatalf("%d entities left: %d direct hits should have broken the canister", len(g.entities), pickupHP)
+	}
+}
+
+// Hulls are checked first: a bolt whose path crosses a canister BEFORE the foe
+// behind it still lands on the foe — a shot never favors a crate over a threat.
+func TestABoltNeverFavorsACrateOverAThreat(t *testing.T) {
+	g := salvageGame(t)
+	g.entities = append(g.entities, pickup(powerHeal, 600, 500)) // in the bolt's path, nearer than the ship
+
+	g.enemyShots = []projectile{{
+		x: 700, y: 500, px: 700, py: 500, vx: -250, vy: 0, life: 10,
+		faction: 2, sid: 9, hullDmg: 1,
+	}}
+	g.stepEnemyShots() // one segment over the canister at 600 and the faction-1 ship at 500
+
+	if len(g.entities) != 2 {
+		t.Fatalf("%d entities left, want the wounded ship and the untouched canister", len(g.entities))
+	}
+	if g.entities[0].hp != 1 {
+		t.Errorf("the ship's hull is %d, want 1: the bolt should have hit IT", g.entities[0].hp)
+	}
+	if g.entities[1].hp != pickupHP {
+		t.Errorf("the canister was chipped to %d; the threat behind it should have taken the bolt", g.entities[1].hp)
+	}
+}
+
+// Campaign parity: outside skirmish, enemy fire leaves pickups alone — the v1
+// rule that only the player's deliberate hits break things.
+func TestCampaignEnemyFireLeavesPickupsAlone(t *testing.T) {
+	g := salvageGame(t)
+	g.skirmishMode = false
+	g.invuln = 1 // park the player test: this is about the pickup
+	g.entities = append(g.entities, pickup(powerHeal, 700, 500))
+
+	g.enemyShots = []projectile{{
+		x: 650, y: 500, px: 650, py: 500, vx: 20, vy: 0, life: 10,
+	}}
+	g.stepEnemyShots()
+
+	if len(g.entities) != 2 {
+		t.Fatal("campaign enemy fire must not break pickups")
+	}
+	if g.entities[1].hp != pickupHP {
+		t.Errorf("the pickup was chipped to %d by enemy fire; the campaign rule leaves it whole", g.entities[1].hp)
+	}
+}
+
+// A missile into a crate detonates AND breaks the crate — and the order
+// matters: the blast kills, killing moves g.entities, and the pickup index
+// only holds while nothing has moved. The reversed order panicked in a real
+// battle. The dying hull sits at a LOWER index than the crate on purpose, so
+// a stale index would reach past the shrunk slice again.
+func TestAMissileIntoACrateBesideADyingHull(t *testing.T) {
+	g := salvageGame(t)
+	victim := foe(2, 690, 500, 1) // one hit from dead, inside the blast, BEFORE the crate in the slice
+	victim.spawn = -1
+	crate := pickup(powerHeal, 700, 500)
+	crate.hp = 1 // one chip from broken
+	g.entities = append(g.entities, victim, crate)
+
+	g.enemyShots = []projectile{{
+		x: 680, y: 500, px: 680, py: 500, vx: 25, vy: 0, life: 10,
+		faction: 2, sid: 9, hullDmg: shipMissileHullDamage, aoe: 70,
+	}}
+	g.stepEnemyShots()
+
+	for i := range g.entities {
+		switch {
+		case g.entities[i].id == 2:
+			t.Fatal("the hull beside the crate survived the blast")
+		case g.entities[i].kind == kindPowerUp:
+			t.Fatal("the crate survived a direct missile")
+		}
+	}
+}

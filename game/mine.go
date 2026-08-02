@@ -26,6 +26,11 @@ var (
 // happens), the blast is blind (once it goes off it hurts whoever is there,
 // the layer's own wingman included). Same rule the missile and the laser
 // already split along — see shiparms.go.
+//
+// Who owns a mine is MECHANICS, not looks: it is drawn exactly as the campaign
+// draws it (crg's rule — skirmish must feel like linefire, and linefire's mine
+// is hot orange with a yellow arming blink). The ships know whose it is; the
+// spectator reads a minefield, which is what a minefield should read as.
 type mine struct {
 	x, y    float64
 	arm     int        // frames until armed; >0 = arming (blinking), 0 = live
@@ -115,28 +120,21 @@ func (g *Game) drawMines(dst *ebiten.Image, cam ebiten.GeoM, glow bool) {
 		px, py := cam.Apply(m.x, m.y)
 		cx, cy := float32(px), float32(py)
 		r := float32(mineCoreRadius * scale)
-		// In skirmish colour says FACTION, never type: a trap you cannot tell
-		// the owner of is a trap nobody can play around. The blink still says
-		// "arming" — that reading is in the blinking, not in the hue.
-		body, arming := mineColor, mineArmingColor
-		if g.skirmishMode {
-			body, arming = m.col, m.col
-		}
 
 		if m.arm > 0 {
 			if (m.arm/mineBlinkPeriod)%2 == 0 {
-				vector.FillCircle(dst, cx, cy, r, arming, true)
+				vector.FillCircle(dst, cx, cy, r, mineArmingColor, true)
 			}
 			continue
 		}
 		if !glow {
-			ring := body
+			ring := mineColor
 			ring.A = 0x50
 			vector.StrokeCircle(dst, cx, cy, float32(m.trigger*scale), float32(1*g.dpr), ring, true)
 		}
 		if glow {
 			r *= 1.6 // a fatter, softer core feeds the bloom
 		}
-		vector.FillCircle(dst, cx, cy, r, body, true)
+		vector.FillCircle(dst, cx, cy, r, mineColor, true)
 	}
 }
