@@ -2,6 +2,7 @@ package game
 
 import (
 	"math"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/crgimenes/linefire/filoio"
@@ -18,6 +19,10 @@ func mazeGame(t *testing.T, seed int64, x, y float64) *Game {
 	}
 	g := newWithContent(filoio.OSFS(), player, lvl, "../gameassets", false)
 	g.skirmishMode = true
+	// Seed the simulation's dice: patrol picks its heading from them, so an
+	// unseeded fixture wanders differently on every run and the assertions
+	// below become a coin toss. Determinism is the whole method here.
+	g.simRand = rand.New(rand.NewPCG(uint64(seed), 0x53494d)) // #nosec G115 -- a test seed
 	g.entities = append(g.entities, entity{
 		kind: kindEnemy, id: 1, x: x, y: y, radius: 12,
 		hp: 3, hpMax: 3, faction: 1, radar: 400, fireEvery: 60,
@@ -86,5 +91,34 @@ func TestSeekingAClearTargetStillHeadsStraight(t *testing.T) {
 	}
 	if after := math.Hypot(tx-e.x, ty-e.y); after >= before {
 		t.Errorf("the hull did not close on a clear target: %.0f -> %.0f", before, after)
+	}
+}
+
+// A point the hull can approach but never REACH — the corner of a pocket, with
+// rock in the last stretch — is just as undeliverable as one with no route at
+// all, and the engine has to say so. A program cannot see terrain, so it judges
+// arrival by distance, and any fixed distance can be defeated by a wall: this
+// exact hull was measured parked for a whole battle 145 units from the corner
+// it wanted, with its program set to move on at 120. Close enough to keep
+// asking, too far to ever satisfy.
+func TestArrivingAsCloseAsTheRockAllowsCountsAsBlocked(t *testing.T) {
+	const tx, ty = 2216.0, 1208.0
+	g := mazeGame(t, 27, 2185, 1350)
+	e := &g.entities[len(g.entities)-1]
+
+	// The fixture must be the interesting case: a route EXISTS (so the
+	// no-route rule cannot be what fires) and the last stretch is rock.
+	if p := g.nav.findPath(e.x, e.y, tx, ty); len(p) == 0 {
+		t.Fatal("this test needs a target with a route; it got none")
+	}
+	if g.clearPath(e.x, e.y, tx, ty, e.radius) {
+		t.Fatal("this test needs rock between the hull and the point")
+	}
+
+	for range repathInterval + 2 { // long enough to spend the path and repath once
+		g.pursuePath(e, tx, ty)
+	}
+	if !e.navBlocked {
+		t.Error("the engine delivered everything it could and still reported the order as working")
 	}
 }

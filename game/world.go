@@ -345,6 +345,15 @@ func (g *Game) pursuePath(e *entity, tx, ty float64) {
 	//
 	// A ship the engine cannot deliver is still a ship: it patrols, staying in
 	// the battle instead of becoming a fixture on a wall.
+	//
+	// And this counts as BLOCKED, not merely "no route found". A program cannot
+	// see terrain, so it judges arrival by distance — and any fixed distance can
+	// be defeated by a wall. One hull was measured parked for a whole battle 145
+	// units from the corner it wanted, its program set to move on at 120: close
+	// enough to keep asking, too far to ever satisfy. The engine is the only one
+	// that knows it has delivered everything it can, so it says so instead of
+	// patrolling quietly while the program waits for an arrival that cannot come.
+	e.navBlocked = true
 	if !e.stationary {
 		g.patrol(e)
 	}
