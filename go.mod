@@ -25,3 +25,5 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 )
+
+replace github.com/crgimenes/linefire => /Users/crg/Projects/linefire

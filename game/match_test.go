@@ -182,3 +182,47 @@ func TestBattleScoreboardReconciles(t *testing.T) {
 		t.Fatalf("scoreboard does not reconcile: %d kills vs %d losses", s2.Kills, s1.Losses)
 	}
 }
+
+// Every battle must open on a fresh deployment, not just a fresh map. The
+// fleets are dealt from the HORDE's dice (dealFleets -> spawnArrival), and
+// those were seeded from a constant — so the arena regenerated on every launch
+// while the ships kept landing on exactly the same spots, session after
+// session. crg caught it by eye: "as naves estão aparecendo no mesmo lugar
+// quando eu peço o deploy novamente".
+func TestEachArenaDealsItsFleetsSomewhereNew(t *testing.T) {
+	deal := func() ([][2]float64, int64) {
+		g, err := NewSkirmish(filoio.OSFS(), "../gameassets", SkirmishOptions{
+			Mode: MatchLastFleet, Ships: 3,
+		})
+		if err != nil {
+			t.Fatalf("NewSkirmish: %v", err)
+		}
+		g.dealFleets()
+		if len(g.arrivals) == 0 {
+			t.Fatal("no fleet was dealt: the fixture proves nothing")
+		}
+		at := make([][2]float64, 0, len(g.arrivals))
+		for _, a := range g.arrivals {
+			at = append(at, [2]float64{a.x, a.y})
+		}
+		return at, g.arenaSeed
+	}
+
+	first, seedA := deal()
+	second, seedB := deal()
+	if seedA == seedB {
+		t.Fatalf("two arenas were generated from the same seed %d", seedA)
+	}
+	if len(first) != len(second) {
+		t.Fatalf("different fleet sizes dealt: %d and %d", len(first), len(second))
+	}
+	same := 0
+	for i := range first {
+		if first[i] == second[i] {
+			same++
+		}
+	}
+	if same == len(first) {
+		t.Fatalf("both arenas dealt every ship to the identical spot: %v", first)
+	}
+}

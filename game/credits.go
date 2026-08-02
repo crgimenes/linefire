@@ -157,9 +157,14 @@ func (g *Game) buildCreditsArena() {
 	g.syncSlots()
 	g.hasComputer, g.autoFire = true, true
 
-	// An endless horde makes the backdrop busy on any map.
+	// An endless horde makes the backdrop busy on any map. It is seeded from
+	// THIS arena's seed, not from a constant: the horde's dice are also what
+	// deal a match's fleets onto the field (dealFleets -> spawnArrival), so a
+	// fixed seed meant every battle of every session opened with the ships in
+	// exactly the same places — a fresh map with a stale deployment. The seeded
+	// runner is unaffected: it builds its own horde from the battle's seed.
 	g.horde = newHorde(level.Horde{
-		Types: []string{"enemy", "rusher", "sniper", "tank"}, Interval: 24, MaxAlive: 18, Ramp: 600, Seed: 7,
+		Types: []string{"enemy", "rusher", "sniper", "tank"}, Interval: 24, MaxAlive: 18, Ramp: 600, Seed: seed,
 	})
 
 	if g.sfx != nil {
