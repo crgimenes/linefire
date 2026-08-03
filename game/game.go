@@ -658,6 +658,14 @@ func (g *Game) updateHotkeys() {
 }
 
 func (g *Game) Update() error {
+	// A quit asked for over the control plane (control.go) ends the game HERE:
+	// the command is consumed on this loop, and this loop is the only thing
+	// allowed to stop it. One tick's latency, and the game exits its own way
+	// rather than being killed from outside.
+	if g.quitRequested() {
+		return ebiten.Termination
+	}
+
 	g.sfx.update()    // tick sound throttles + prune finished players (nil-safe)
 	g.laserOn = false // re-asserted each frame the beam is actually held
 

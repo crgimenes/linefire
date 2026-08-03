@@ -14,9 +14,17 @@ import (
 //
 //	{"op":"restart"}                                  stage the battle again
 //	{"op":"match","mode":"timed","ships":6,"duration":120}   reconfigure and stage
+//	{"op":"quit"}                                     end the battle and exit
 //
-// Anything invalid is reported and ignored — the show goes on. Quitting is
-// the transport owner's business (close the process), not a game command.
+// Anything invalid is reported and ignored — the show goes on.
+//
+// Quitting used to be left to the transport owner, on the reasoning that
+// ending a process it started is a launcher's own business. crg turned that
+// around: there is already a channel here, so ASKING costs nothing, while a
+// signal costs portability — the caller ends up writing per-platform process
+// handling for something the protocol says in seven bytes. Asking is also the
+// better of the two, because a game that is asked gets to end on its own
+// terms instead of being cut down mid-frame.
 type MatchCommand struct {
 	Op       string `json:"op"`
 	Mode     string `json:"mode,omitempty"`
@@ -30,6 +38,11 @@ type MatchCommand struct {
 type controlInbox struct {
 	mu  sync.Mutex
 	cmd *MatchCommand // the pending command; the last one posted wins
+	// quit lives HERE, and not on Game, for the same reason the inbox does: an
+	// arena rebuild replaces *g wholesale, and a flag it forgot to carry over
+	// would be a quit that silently never happened. Behind this pointer it
+	// cannot be dropped.
+	quit bool
 }
 
 // PostCommand queues a control command for the game loop. Safe to call from
@@ -59,6 +72,10 @@ func (g *Game) consumeCommand() {
 	switch cmd.Op {
 	case "restart":
 		g.startMatch()
+	case "quit":
+		g.ctrl.mu.Lock()
+		g.ctrl.quit = true
+		g.ctrl.mu.Unlock()
 	case "match":
 		m, err := newMatch(cmd.Mode, cmd.Ships, cmd.Duration*60, g.factions)
 		if err != nil {
@@ -70,6 +87,18 @@ func (g *Game) consumeCommand() {
 	default:
 		log.Printf("control: unknown op %q (command ignored)", cmd.Op)
 	}
+}
+
+// quitRequested reports whether the control plane asked the game to end. Only
+// the game loop may actually end it — Update returns ebiten.Termination — so
+// the command sets a flag and the loop reads it on the next tick.
+func (g *Game) quitRequested() bool {
+	if g.ctrl == nil {
+		return false
+	}
+	g.ctrl.mu.Lock()
+	defer g.ctrl.mu.Unlock()
+	return g.ctrl.quit
 }
 
 // emitBattleEvent announces the battle now staged: the garage's cue to reset
