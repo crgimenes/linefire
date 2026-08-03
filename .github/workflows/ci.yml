@@ -6,9 +6,13 @@ permissions:
   contents: read
 
 jobs:
-  # Native per-OS test pass — the real gate. Ebitengine is pure-Go on macOS and
-  # Windows (purego), but needs cgo + X11/OpenGL/ALSA headers on Linux, so Linux is
-  # tested natively here rather than cross-compiled.
+  # Native per-OS test pass — the real gate: cross-compiling proves a build,
+  # never a run.
+  #
+  # NO CGO, on any platform, Linux included. Ebitengine is pure Go there on the
+  # v2.10 alpha this project pins — which is exactly why it pins that alpha.
+  # Setting it at the job level is the enforcement: a dependency that quietly
+  # needed a C toolchain fails here instead of on somebody's machine.
   test:
     name: test-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -16,25 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install Linux dependencies (Ebitengine)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev \
-            libc6-dev \
-            libgl1-mesa-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libxinerama-dev \
-            libxrandr-dev \
-            libxxf86vm-dev \
-            pkg-config
       - run: go build ./...
       - run: go vet ./...
       # The tests build worlds and assets but never open a window (no RunGame/Draw),
@@ -45,9 +37,9 @@ jobs:
         run: go test -timeout 120s -count 1 ./...
 
   # Compile-check every target the release ships, plus the web build. Nothing
-  # here needs cgo — Ebitengine has been pure Go on Linux too since v2.10 —
-  # which is what lets one host cross-compile the whole matrix and why the
-  # release is a local script rather than a workflow. js/wasm builds only the
+  # here needs cgo, which is what lets one host cross-compile the whole matrix
+  # and why the release is a local script (the shared ./release.sh) rather than
+  # a workflow with a runner per platform. js/wasm builds only the
   # game: the editors need OS dialogs and subprocesses with no browser
   # equivalent.
   cross-build:
@@ -77,26 +69,13 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      # golangci-lint type-checks the native (linux) build, whose Ebitengine cgo needs
-      # these headers to preprocess.
-      - name: Install Linux dependencies (Ebitengine)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev \
-            libc6-dev \
-            libgl1-mesa-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libxinerama-dev \
-            libxrandr-dev \
-            libxxf86vm-dev \
-            pkg-config
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - name: Install golangci-lint
