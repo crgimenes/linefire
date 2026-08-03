@@ -42,3 +42,7 @@ docs/campaign.md
 
 .claude
 linefire
+
+# The .iconset is scaffolding for iconutil; the .icns and the PNG it produces
+# are what the release and the README use.
+/assets/*.iconset/

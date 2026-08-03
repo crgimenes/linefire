@@ -3,7 +3,8 @@
 # Targets:
 #   make build       — build every cmd/<name> for the current OS/arch into bin/
 #   make build-cross — also build for linux/amd64
-#   make release     — standalone game binaries (embedded data) for the desktop matrix
+#   make release     — publish a release through the shared ./release.sh
+#   make icons       — redraw the application icon from the game's own art
 #   make wasm        — the web build into web/ (linefire.wasm + wasm_exec.js)
 #   make serve-web   — build wasm and serve web/ locally for a browser test
 #   make run         — run the standalone asset editor (GUI)
@@ -23,15 +24,15 @@ CMDS   := $(notdir $(wildcard cmd/*))
 GOOS   := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
 
-# Release: the game carries its data in the binary (go:embed), so these run standalone.
-# VERSION is stamped into the binary (linefire -version). The desktop matrix below builds
-# pure-Go from any host; linux needs cgo for ebiten (X11/OpenGL), so it is built on a linux
-# runner in CI rather than cross-compiled here.
+# The game carries its data in the binary (go:embed), so every build runs
+# standalone. VERSION is stamped into it (linefire -version) for local builds;
+# the release stamps its own from the tag. Every target is pure Go — no cgo on
+# any platform, Linux included, since Ebitengine v2.10 — so one host builds
+# them all and the release needs no runner.
 VERSION         := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 RELEASE_LDFLAGS := -s -w -X main.version=$(VERSION)
-RELEASE_TARGETS := darwin/arm64 darwin/amd64 windows/amd64
 
-.PHONY: all build build-cross release wasm serve-web run run-edit run-game check fix fix-inline vet fmt test security tidy clean
+.PHONY: all build build-cross release icons wasm serve-web run run-edit run-game check fix fix-inline vet fmt test security tidy clean
 
 all: build
 
@@ -59,14 +60,23 @@ serve-web: wasm
 	@echo "  -> http://localhost:8080/  (game at /play.html)"
 	@cd web && python3 -m http.server 8080
 
+# The shipped release is the SHARED script (~/Projects/scripts/release.sh,
+# linked here as ./release.sh): every project in the house releases the same
+# way, so the flow is fixed in one place instead of drifting per repository.
+# It cross-compiles every target locally with CGO_ENABLED=0 — no cgo anywhere,
+# which Ebitengine v2.10 made true for the game projects too — builds the
+# signed and notarized universal macOS app from assets/linefire.icns, publishes
+# the GitHub release and updates the Homebrew cask. It needs a clean worktree
+# and a tag pointing at HEAD.
 release:
-	@mkdir -p bin
-	@for t in $(RELEASE_TARGETS); do \
-	  os=$${t%/*}; arch=$${t#*/}; ext=; [ "$$os" = windows ] && ext=.exe; \
-	  echo "  -> linefire-$$os-$$arch$$ext ($(VERSION))"; \
-	  GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "$(RELEASE_LDFLAGS)" \
-	    -o bin/linefire-$$os-$$arch$$ext ./cmd/linefire || exit 1 ; \
-	done
+	./release.sh
+
+# The application icon, drawn from the game's own art (icon/): the .iconset for
+# iconutil, the .icns the release bundles, and a PNG to look at.
+icons:
+	go run assets/genicon.go
+	iconutil -c icns assets/linefire.iconset -o assets/linefire.icns
+	@ls -lh assets/linefire.icns assets/linefire.png
 
 run:
 	go run $(RUN_FLAGS) ./cmd/linefire-editor

@@ -44,10 +44,12 @@ jobs:
         timeout-minutes: 10
         run: go test -timeout 120s -count 1 ./...
 
-  # Compile-check the pure-Go release targets (what `make release` ships) plus the
-  # web build. Linux is excluded on purpose: it needs cgo and is built natively
-  # (test job + release-linux). js/wasm builds only the game — the editors need
-  # OS dialogs and subprocesses that have no browser equivalent.
+  # Compile-check every target the release ships, plus the web build. Nothing
+  # here needs cgo — Ebitengine has been pure Go on Linux too since v2.10 —
+  # which is what lets one host cross-compile the whole matrix and why the
+  # release is a local script rather than a workflow. js/wasm builds only the
+  # game: the editors need OS dialogs and subprocesses with no browser
+  # equivalent.
   cross-build:
     name: cross-build-${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
@@ -58,6 +60,8 @@ jobs:
           - { goos: darwin, goarch: amd64, pkg: "./..." }
           - { goos: darwin, goarch: arm64, pkg: "./..." }
           - { goos: windows, goarch: amd64, pkg: "./..." }
+          - { goos: linux, goarch: amd64, pkg: "./..." }
+          - { goos: linux, goarch: arm64, pkg: "./..." }
           - { goos: js, goarch: wasm, pkg: "./cmd/linefire" }
     steps:
       - uses: actions/checkout@v4
