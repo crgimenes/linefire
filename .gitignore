@@ -25,6 +25,7 @@ go.work.sum
 # Default editor output file
 linefire_asset.json
 TODO.md
+docs
 
 # Runtime-generated procedural map chunks
 procmaps/
