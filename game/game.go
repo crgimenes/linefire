@@ -543,6 +543,12 @@ func Run(content fs.FS, player *asset.Asset, lvl *level.Level, mapDir, mapName s
 	ebiten.SetWindowTitle("Linefire")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowSizeLimits(480, 360, -1, -1)
+	// Closing the window (its red button, or Cmd+Q — which macOS turns into the
+	// same close request) must run through the game loop like every other exit,
+	// so the settings the player just changed are persisted instead of dying
+	// with the process. Update MUST honour it: while this is on, nothing else
+	// closes the window.
+	ebiten.SetWindowClosingHandled(true)
 	g := newWithContent(content, player, lvl, mapDir, false)
 	g.mapName = mapName
 	g.startMap = mapName                  // remember where the campaign began, so a victory can replay it
@@ -657,13 +663,22 @@ func (g *Game) updateHotkeys() {
 	}
 }
 
+// endGame persists the session's settings and stops the loop. EVERY exit goes
+// through it — the pause menu's Quit, Esc on the title screen, a control-plane
+// quit and the window's close button — because a save wired to one exit is a
+// save the other exits drop on the floor. Nil-safe through saveConfig.
+func (g *Game) endGame() error {
+	g.sfx.saveConfig()
+	return ebiten.Termination
+}
+
 func (g *Game) Update() error {
-	// A quit asked for over the control plane (control.go) ends the game HERE:
-	// the command is consumed on this loop, and this loop is the only thing
-	// allowed to stop it. One tick's latency, and the game exits its own way
-	// rather than being killed from outside.
-	if g.quitRequested() {
-		return ebiten.Termination
+	// A quit asked for over the control plane (control.go), or the window being
+	// closed, ends the game HERE: the request is consumed on this loop, and this
+	// loop is the only thing allowed to stop it. One tick's latency, and the game
+	// exits its own way rather than being killed from outside.
+	if g.quitRequested() || ebiten.IsWindowBeingClosed() {
+		return g.endGame()
 	}
 
 	g.sfx.update()    // tick sound throttles + prune finished players (nil-safe)
@@ -694,8 +709,7 @@ func (g *Game) Update() error {
 		g.stepIPC() // feed the external drivers their factions' state
 	case g.creditsMode:
 		if g.titleMode && inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-			g.sfx.saveConfig()
-			return ebiten.Termination // Esc quits from the title screen
+			return g.endGame() // Esc quits from the title screen
 		}
 		if g.stepCreditsMeta() {
 			return nil // Esc dropped back to a fresh game

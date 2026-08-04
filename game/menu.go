@@ -87,8 +87,7 @@ func (g *Game) updatePauseMenu() error {
 		return nil
 	}
 	if quit {
-		g.sfx.saveConfig()
-		return ebiten.Termination
+		return g.endGame()
 	}
 	return nil
 }
