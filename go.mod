@@ -7,7 +7,7 @@ require (
 	github.com/crgimenes/filo v0.0.16
 	github.com/crgimenes/gion v0.0.4
 	github.com/crgimenes/minigui v0.1.9
-	github.com/crgimenes/native v0.1.6
+	github.com/crgimenes/native v0.1.7
 	github.com/hajimehoshi/ebiten/v2 v2.10.0-alpha.13
 )
 
