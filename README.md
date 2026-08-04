@@ -55,7 +55,20 @@ inside any document, and maps can use geometry generators like
 All I/O lives in `filoio/` (parse + emit, with byte-for-byte round-trip
 tests); the model packages `asset/` and `level/` are pure structs, free of any
 serialization concern. The player's local config (audio, best times) is also
-Filo, at `~/.config/linefire/config.filo`.
+Filo, written to the platform's own user-config directory — whatever Go's
+`os.UserConfigDir()` reports, never a hardcoded path:
+
+| Platform | `config.filo` lives in |
+|----------|------------------------|
+| macOS    | `~/Library/Application Support/linefire/` |
+| Linux    | `$XDG_CONFIG_HOME/linefire/` (default `~/.config/linefire/`) |
+| Windows  | `%AppData%\linefire\` |
+
+The macOS app on the releases page runs in the App Sandbox, so macOS redirects
+that path into the app's own container
+(`~/Library/Containers/com.github.crgimenes.linefire/Data/…`). A build you
+compile yourself is not sandboxed and uses the plain path above — the two keep
+separate settings and best times, which is the sandbox working as intended.
 
 A minimal map looks like:
 
@@ -97,7 +110,8 @@ The game data (the `gameassets/` and `music/` trees) is embedded in the binary w
 `go:embed`, so a built `linefire` runs standalone: no files alongside it, from any
 directory. `-dir` overrides that with a directory on disk (dev iteration or community
 content), pointing at a folder laid out like the repository root (`gameassets/` beside
-`music/`).
+`music/`). It is a development flag: the sandboxed macOS app from the releases page
+cannot read a tree outside its container, and plays the embedded data instead.
 
 ```sh
 go run -trimpath ./cmd/linefire              # run from the embedded game data

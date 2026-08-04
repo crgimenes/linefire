@@ -15,8 +15,8 @@ import (
 	"github.com/crgimenes/linefire/config"
 )
 
-// The config document — the player's personal settings, a denshi-style Filo script at
-// ~/.config/linefire/config.filo:
+// The config document — the player's personal settings, a denshi-style Filo script in
+// the platform's user-config directory (see ConfigPath):
 //
 //	(config
 //	  (volume 0.7)
@@ -31,9 +31,12 @@ import (
 // ExtConfig is the config file extension (a denshi-style user script).
 const ExtConfig = ".filo"
 
-// ConfigPath is the per-user settings file (~/.config/linefire/config.filo or the OS
-// equivalent). An error means the platform has no user config dir; the caller skips
-// persistence and plays with defaults.
+// ConfigPath is the per-user settings file, under whatever directory the platform uses
+// for user config — ~/Library/Application Support on macOS, $XDG_CONFIG_HOME (or
+// ~/.config) on Linux, %AppData% on Windows. Never a hardcoded path: os.UserConfigDir is
+// also what the macOS App Sandbox redirects into the app's container, so a sandboxed
+// build lands in the right place for free. An error means the platform has no user
+// config dir; the caller skips persistence and plays with defaults.
 func ConfigPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
