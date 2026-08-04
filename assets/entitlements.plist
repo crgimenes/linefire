@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS entitlements. release.sh signs with this file simply because it exists here —
+  that presence is the switch, so the sandbox needs no flag and no configuration.
+
+  The game asks for nothing but the sandbox itself: it carries its own assets through
+  //go:embed and writes only to the per-user config directory, which the sandbox
+  redirects into the app container on its own. No network, no file pickers, no
+  microphone. That is also what makes it Mac App Store material without further work.
+
+  The one flag that stops working under the sandbox is -dir, which points the game at a
+  game-assets tree outside the container; that flag is a development tool, and a
+  sandboxed build runs from the embedded content instead.
+
+  Gamepad support may need com.apple.security.device.bluetooth for wireless controllers
+  once it lands — to be confirmed against a real controller, not guessed.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>

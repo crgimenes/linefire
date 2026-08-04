@@ -8,6 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/crgimenes/linefire/config"
 	"github.com/crgimenes/linefire/filoio"
 )
 
@@ -100,7 +101,13 @@ func (g *Game) drawTitle(dst *ebiten.Image) {
 		// reload lands here silent). Nothing can be played before a tap, so say so.
 		g.titleText(dst, "TAP FOR SOUND", cx, float64(h)*0.88, 1.2)
 	}
+	// The build, small and out of the way in the corner: a player reporting a bug can
+	// read it off the screen, which is the only way to tie the report to a build.
+	g.titleText(dst, config.BuildString(), cx, float64(h)-versionInset*g.dpr, 1)
 }
+
+// versionInset is how far the build string sits above the bottom edge, in logical px.
+const versionInset = 16
 
 // attractShowingRecords reports whether the front door is on its records half this frame. A
 // free-running clock drives it, so no page state must survive the periodic backdrop rebuild.

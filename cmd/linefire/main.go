@@ -23,16 +23,22 @@ import (
 	"github.com/crgimenes/devengine/log"
 
 	"github.com/crgimenes/linefire"
+	"github.com/crgimenes/linefire/config"
 	"github.com/crgimenes/linefire/filoio"
 	"github.com/crgimenes/linefire/game"
 )
 
-// version is stamped at build time (see the release target: -X main.version=...).
-// It defaults to "dev" for a plain `go build`, so a bug report can name the build.
-var version = "dev"
+// Version is stamped at build time by the shared release script
+// (-ldflags "-X main.Version=<tag>"). It defaults to "dev" for a plain `go build`, so a
+// bug report can always name the build it came from. It lives in main, exported, because
+// that one name is what the release script can reach in EVERY project without knowing any
+// module path; the value is handed to config.Version below so the rest of the program can
+// read it without importing main.
+var Version = "dev"
 
 func main() {
 	log.SetFlags(0)
+	config.Version = Version
 	dir := flag.String("dir", "", "read game data from this directory instead of the embedded bundle")
 	mapDir := flag.String("mapdir", "gameassets", "maps/assets subdirectory within the game data")
 	startMap := flag.String("map", "map0001", "map file stem to open (for playtesting a specific stage)")
@@ -40,7 +46,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("linefire", version)
+		fmt.Println("linefire", config.BuildString())
 		return
 	}
 
