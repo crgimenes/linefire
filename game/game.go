@@ -108,6 +108,7 @@ type Game struct {
 	flood     *floodmap  // negative-space map: reachable interior + boundary glow
 	floodView bool       // render the flood-fill glow map instead of line walls (F2)
 	simpleMap bool       // skip flood + fog (procedural map): fast render, cheap rebuild
+	embedded  bool       // running inside the editor's window (NewPlaytest): leaving returns there
 	debugHUD  bool       // show the developer overlay (F3): FPS/TPS, counts, mode
 	memLine   string     // cached memory readout for the debug overlay
 	memTick   int        // frames until the memory readout refreshes
@@ -343,6 +344,20 @@ func (g *Game) presentOverlay(screen *ebiten.Image, draw func(dst *ebiten.Image)
 // uses newWithContent to serve the same data from the embedded bundle instead.
 func New(player *asset.Asset, lvl *level.Level, mapDir string, simple bool) *Game {
 	return newWithContent(filoio.OSFS(), player, lvl, mapDir, simple)
+}
+
+// NewPlaytest builds a game the editor can run INSIDE its own window (F5), on the map
+// currently being edited — including edits not yet saved, which is the whole point of a
+// tight authoring loop. It differs from Run in what it deliberately leaves out: no
+// window setup (the editor owns the window), no title screen (drop straight into the
+// stage) and no sound bank (an audio device opened and closed on every F5 buys nothing
+// for checking a layout). Naming the map matters even though the level is in memory:
+// portals that lead back to this same map are matched by name.
+func NewPlaytest(player *asset.Asset, lvl *level.Level, mapDir, mapName string) *Game {
+	g := New(player, lvl, mapDir, false)
+	g.mapName, g.startMap = mapName, mapName
+	g.embedded = true // so the pause menu offers the editor back, not a "Quit" that lies
+	return g
 }
 
 // newWithContent is New with an explicit content FS, so the shipped binary serves

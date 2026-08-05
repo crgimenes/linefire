@@ -35,8 +35,9 @@ func (e *MapEditor) handleInput() {
 		return
 	}
 
-	// F5 playtests the open map (save + launch the game on it). It is a function key,
-	// not a text char, so it fires even while a name/target field has focus.
+	// F5 plays the open map in this window, unsaved edits included; F5 again returns
+	// (the host handles that half, since the editor is not running during play). It is
+	// a function key, not a text char, so it fires even while a field has focus.
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		e.playtest()
 	}

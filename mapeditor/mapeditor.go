@@ -152,6 +152,10 @@ type MapEditor struct {
 	// to onOpenAsset, a map double-click goes to onOpenMap.
 	onOpenAsset func(path string)
 	onOpenMap   func(path string)
+
+	// onPlaytest, when set by the host app, plays the map in the same window (F5).
+	// It receives a COPY of the document, so playing never disturbs what is open here.
+	onPlaytest func(lvl *level.Level, name string)
 }
 
 // New creates a map editor for the given level. savePath is the file used when

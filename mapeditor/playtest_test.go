@@ -1,48 +1,57 @@
 package mapeditor
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/crgimenes/linefire/level"
 )
 
-// TestModuleRoot: moduleRoot walks up to the directory holding go.mod (where `go run
-// ./cmd/linefire` resolves), and errors when there is none above the start.
-func TestModuleRoot(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	deep := filepath.Join(root, "gameassets", "nested")
-	if err := os.MkdirAll(deep, 0o750); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := moduleRoot(deep)
-	if err != nil {
-		t.Fatalf("moduleRoot: %v", err)
-	}
-	if got != root {
-		t.Fatalf("moduleRoot = %q, want %q", got, root)
-	}
-
-	// A tree with no go.mod above it must error rather than loop or return "".
-	bare := t.TempDir()
-	if _, err := moduleRoot(bare); err == nil {
-		t.Fatal("moduleRoot should error when no go.mod is found above the start")
-	}
-}
-
-// TestMapStem: the map's launch name is its file stem, with the .lfm extension dropped.
+// TestMapStem: the map's name is its file stem with the .lfm extension dropped, and
+// an unsaved map (no path) simply has no name.
 func TestMapStem(t *testing.T) {
 	cases := map[string]string{
 		filepath.Join("a", "b", "map0005.lfm"): "map0005",
 		"x.lfm":                                "x",
 		"map0001.lfm":                          "map0001",
+		"":                                     "",
 	}
 	for in, want := range cases {
 		if got := mapStem(in); got != want {
 			t.Fatalf("mapStem(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestPlaytestHandsOutACopy: F5 must never let the play session reach the document
+// being edited — the host receives a clone, not the editor's own level.
+func TestPlaytestHandsOutACopy(t *testing.T) {
+	e := New(level.New(), "gameassets/map0001.lfm", "gameassets")
+
+	var got *level.Level
+	var gotName string
+	e.SetOnPlaytest(func(lvl *level.Level, name string) {
+		got, gotName = lvl, name
+	})
+	e.playtest()
+
+	if got == nil {
+		t.Fatal("playtest did not reach the host")
+	}
+	if got == e.level {
+		t.Fatal("host received the editor's own level; edits during play would corrupt the document")
+	}
+	if gotName != "map0001" {
+		t.Fatalf("name = %q, want %q", gotName, "map0001")
+	}
+}
+
+// TestPlaytestWithoutHostIsInert: standalone (no host wired), F5 reports rather than
+// panicking on a nil callback.
+func TestPlaytestWithoutHostIsInert(t *testing.T) {
+	e := New(level.New(), "gameassets/map0001.lfm", "gameassets")
+	e.playtest() // must not panic
+	if e.status == "" {
+		t.Fatal("playtest without a host should say so in the status line")
 	}
 }

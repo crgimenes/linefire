@@ -72,7 +72,13 @@ func (g *Game) updatePauseMenu() error {
 	}
 	resume := g.menu.Button("resume", "Resume")
 	restart := g.menu.Button("restart", "Restart")
-	quit := g.menu.Button("quit", "Quit")
+	// Under the editor this button does not quit anything — it hands the window back.
+	// Saying "Quit" there would read as "lose my map", which is the opposite of true.
+	leaveLabel := "Quit"
+	if g.embedded {
+		leaveLabel = "Back to editor"
+	}
+	quit := g.menu.Button("quit", leaveLabel)
 	g.menu.EndPanel()
 	g.menu.End()
 

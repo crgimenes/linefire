@@ -1,77 +1,39 @@
 package mapeditor
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/level"
 )
 
-// playtest saves the open map and launches the game runtime straight onto it, so
-// authoring a stage and trying it is one key (F5) instead of a save plus a terminal
-// round trip. The map must be named first — an untitled map has nowhere to load from.
+// SetOnPlaytest wires the host's play-in-this-window switch (see editapp). Without it
+// F5 reports that playtesting is unavailable rather than doing something surprising.
+func (e *MapEditor) SetOnPlaytest(fn func(lvl *level.Level, name string)) {
+	e.onPlaytest = fn
+}
+
+// playtest hands the map being edited to the host to play right here, in this window.
+// It does NOT save first and does not need a named file: the whole point is trying a
+// change the instant it is made, so the loop is one key each way and an experiment can
+// be undone instead of persisted. The host gets a clone, so the play session can never
+// disturb the document under edit.
 func (e *MapEditor) playtest() {
-	if e.savePath == "" {
-		e.status = "playtest: name the map first (Cmd+S)"
+	if e.onPlaytest == nil {
+		e.status = "playtest: unavailable (no host)"
 		return
 	}
-	e.writeSave() // persist the current edits so the launched game sees them
-	err := launchPlaytest(e.savePath)
-	if err != nil {
-		e.status = "playtest: " + err.Error()
-		return
-	}
-	e.status = "playtest: launching " + mapStem(e.savePath)
-}
-
-// launchPlaytest starts `go run ./cmd/linefire` on the map at path, resolving assets
-// and music the way the shipped game does: content rooted at the directory that holds
-// the map's folder (so a sibling music/ still resolves), the map's folder as -mapdir,
-// and the file stem as -map. It runs from the module root and does not wait — the game
-// opens its own window while the editor keeps running.
-func launchPlaytest(mapPath string) error {
-	abs, err := filepath.Abs(mapPath)
-	if err != nil {
-		return err
-	}
-	mapDir := filepath.Dir(abs)  // e.g. /repo/gameassets
-	root := filepath.Dir(mapDir) // e.g. /repo (holds gameassets/ and music/)
-	module, err := moduleRoot(mapDir)
-	if err != nil {
-		return err
-	}
-	// #nosec G204 -- a dev tool launching the local game on the file being edited
-	cmd := exec.Command("go", "run", "./cmd/linefire",
-		"-dir", root,
-		"-mapdir", filepath.Base(mapDir),
-		"-map", mapStem(abs))
-	cmd.Dir = module
-	cmd.Stdout = os.Stdout // surface the game's build/run output on the editor's console
-	cmd.Stderr = os.Stderr
-	return cmd.Start()
-}
-
-// moduleRoot walks up from dir to the directory holding go.mod (where `go run
-// ./cmd/linefire` resolves), erroring if the map is edited outside the repository.
-func moduleRoot(dir string) (string, error) {
-	for {
-		_, err := os.Stat(filepath.Join(dir, "go.mod"))
-		if err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("go.mod not found above %s", dir)
-		}
-		dir = parent
-	}
+	name := mapStem(e.savePath) // "" while the map is still untitled
+	e.onPlaytest(e.level.Clone(), name)
+	e.status = "playtest: Esc for the menu, then Back to editor"
 }
 
 // mapStem is a map's file name without its .lfm extension — the name the game and
-// portals refer to it by.
+// portals refer to it by. Empty for an unsaved map.
 func mapStem(path string) string {
+	if path == "" {
+		return ""
+	}
 	return strings.TrimSuffix(filepath.Base(path), filoio.ExtLevel)
 }

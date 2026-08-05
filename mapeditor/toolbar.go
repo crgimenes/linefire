@@ -36,6 +36,13 @@ func (e *MapEditor) runToolbar() {
 		e.save()
 	}
 	e.bar.SameLine()
+	// Play sits next to Save because both answer "what do I do with this map now".
+	// It is a button and not only a key: F5 costs an fn chord on a Mac keyboard,
+	// which is enough friction to kill a loop meant to be run dozens of times.
+	if e.bar.Button("play", "Play") {
+		e.playtest()
+	}
+	e.bar.SameLine()
 	if e.bar.Button("undo", "Undo") {
 		e.undo()
 	}

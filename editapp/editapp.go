@@ -6,10 +6,14 @@
 package editapp
 
 import (
+	"errors"
+
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/crgimenes/linefire/editor"
 	"github.com/crgimenes/linefire/filoio"
+	"github.com/crgimenes/linefire/game"
 	"github.com/crgimenes/linefire/level"
 	"github.com/crgimenes/linefire/mapeditor"
 )
@@ -28,6 +32,7 @@ type App struct {
 	assetDir string // scanned for placeable assets/maps; reused for opened maps
 	cur      ebiten.Game
 	pending  ebiten.Game
+	playing  bool // the active mode is a playtest, not an editor
 }
 
 // New builds the host around a map editor and wires the mode switches.
@@ -43,7 +48,32 @@ func (a *App) newMapEditor(lvl *level.Level, savePath string) *mapeditor.MapEdit
 	ed := mapeditor.New(lvl, savePath, a.assetDir)
 	ed.SetOnOpenAsset(a.openAsset)
 	ed.SetOnOpenMap(a.openMap)
+	ed.SetOnPlaytest(a.playtest)
 	return ed
+}
+
+// playtest stages the game on the map being edited — the same window, the same frame
+// budget, no save and no rebuild. lvl is the editor's clone, so the session is free to
+// blow up walls and spend pickups without touching the document.
+func (a *App) playtest(lvl *level.Level, name string) {
+	player, err := filoio.LoadAsset(filoio.AssetPath(a.assetDir, "player"))
+	if err != nil {
+		return // no player asset next to the map: stay in the editor
+	}
+	a.pending = game.NewPlaytest(player, lvl, a.assetDir, name)
+	a.playing = true
+	title := "Linefire Playtest — F5 returns to editing"
+	if name != "" {
+		title = "Linefire Playtest: " + name + " — F5 returns to editing"
+	}
+	ebiten.SetWindowTitle(title)
+}
+
+// stopPlaytest stages the return to the map editor, exactly as it was left.
+func (a *App) stopPlaytest() {
+	a.playing = false
+	a.pending = a.mapEd
+	a.mapEd.ResetTitle()
 }
 
 // openAsset stages a switch to the asset editor for path; a failed load is ignored
@@ -91,7 +121,26 @@ func (a *App) applyPending() {
 // frame's Update and Draw on the same editor.
 func (a *App) Update() error {
 	a.applyPending()
-	return a.cur.Update()
+	// F5 is the whole loop: it starts a playtest from the editor and ends one from
+	// inside the game. Handled here rather than in the game so it works from any game
+	// state (paused, dead, mid-stage) — the editor is always one key away.
+	if a.playing && inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		a.stopPlaytest()
+		return nil
+	}
+	err := a.cur.Update()
+	if a.playing && errors.Is(err, ebiten.Termination) {
+		// A playtest ends its loop for two very different reasons. Quitting from
+		// inside the game means "back to the editor". The WINDOW closing means the
+		// window closes — swallowing that would leave the app impossible to quit.
+		if ebiten.IsWindowBeingClosed() {
+			a.mapEd.Persist() // the editor's own close autosave never ran this frame
+			return err
+		}
+		a.stopPlaytest()
+		return nil
+	}
+	return err
 }
 
 // Draw renders the active editor.
