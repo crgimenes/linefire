@@ -6,6 +6,7 @@
   (music "music/One_Heart_Remaining.mp3")
   (player-start 1340 60 -90)
   (entry "from_bonus" 1740 480 -90)
+  (entry "from_map2" 2220 -760 -90)
   (wall "walls"
     (stroke "#80ffff") (width 2) (fill "transparent") (glow 0.8)
     (path (move 40 -1120) (line 2320 -1120) (line 2320 1340) (line 40 1340) (close))
