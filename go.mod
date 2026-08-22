@@ -7,14 +7,14 @@ require (
 	github.com/crgimenes/filo v0.0.16
 	github.com/crgimenes/gion v0.0.4
 	github.com/crgimenes/minigui v0.1.9
-	github.com/crgimenes/native v0.1.7
+	github.com/crgimenes/native v0.1.9
 	github.com/hajimehoshi/ebiten/v2 v2.10.0-alpha.13
 )
 
 require (
 	github.com/ebitengine/gomobile v0.0.0-20260820040257-d11f821a26a6 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
-	github.com/ebitengine/oto/v3 v3.5.0-alpha.10 // indirect
+	github.com/ebitengine/oto/v3 v3.5.0-alpha.11 // indirect
 	github.com/ebitengine/purego v0.11.0-alpha.9 // indirect
 	github.com/go-text/typesetting v0.3.5-0.20260710134149-0bd3abe5ff89 // indirect
 	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
