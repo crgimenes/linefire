@@ -1,5 +1,7 @@
 package mapeditor
 
+import "slices"
+
 import "github.com/crgimenes/linefire/asset"
 
 // Path editing (kutta-style): the Delete tool removes a node under the cursor, and the Join tool
@@ -178,8 +180,8 @@ func buildOpenFrom(pts []asset.Command, order []int) []asset.Command {
 
 // lastDrawableIdx returns the index of a path's final non-close command (its end vertex), or -1.
 func lastDrawableIdx(cmds []asset.Command) int {
-	for i := len(cmds) - 1; i >= 0; i-- {
-		if cmds[i].Op != asset.OpClose {
+	for i, cmd := range slices.Backward(cmds) {
+		if cmd.Op != asset.OpClose {
 			return i
 		}
 	}

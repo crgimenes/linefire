@@ -3,6 +3,7 @@ package game
 import (
 	"image/color"
 	"math"
+	"slices"
 
 	"github.com/crgimenes/linefire/effects"
 )
@@ -45,11 +46,11 @@ func (g *Game) explodeAt(x, y float64, dmg int, radius float64, col color.RGBA) 
 	g.playEvent(nil, "explosion")
 	g.digBlast(x, y, radius) // SPIKE: a blast eats a crater out of the rock
 
-	for i := len(g.entities) - 1; i >= 0; i-- {
-		if g.entities[i].kind != kindEnemy {
+	for i, v := range slices.Backward(g.entities) {
+		if v.kind != kindEnemy {
 			continue
 		}
-		d := math.Hypot(g.entities[i].x-x, g.entities[i].y-y)
+		d := math.Hypot(v.x-x, v.y-y)
 		if d > radius {
 			continue
 		}

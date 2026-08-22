@@ -1,5 +1,7 @@
 package game
 
+import "slices"
+
 import "math"
 
 // Salvage: in skirmish there is no player to collect what a kill leaves on the
@@ -98,8 +100,8 @@ func (g *Game) resolveSalvage() {
 		g.salvage(j, i)
 		taken = append(taken, i)
 	}
-	for k := len(taken) - 1; k >= 0; k-- {
-		i := taken[k]
+	for _, i := range slices.Backward(taken) {
+
 		g.entities = append(g.entities[:i], g.entities[i+1:]...)
 	}
 }
