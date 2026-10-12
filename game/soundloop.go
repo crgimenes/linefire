@@ -43,7 +43,7 @@ func (b *soundBank) setLoop(name string, r soundReq, on bool) {
 	p := b.loops[name]
 	if !on || b.silent() {
 		if p != nil {
-			_ = p.Close()
+			p.PauseAndStopReading()
 			delete(b.loops, name)
 		}
 		return
@@ -82,7 +82,7 @@ func (b *soundBank) stopLoops() {
 		return
 	}
 	for name, p := range b.loops {
-		_ = p.Close()
+		p.PauseAndStopReading()
 		delete(b.loops, name)
 	}
 }

@@ -243,7 +243,7 @@ func (b *soundBank) update() {
 			live = append(live, p)
 			continue
 		}
-		_ = p.Close()
+		p.PauseAndStopReading()
 	}
 	b.players = live
 	b.webMusic.poke() // web only: retry a track the autoplay gate held back

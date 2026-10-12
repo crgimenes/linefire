@@ -29,7 +29,7 @@ func stopPreview() {
 	if previewPlayer == nil {
 		return
 	}
-	_ = previewPlayer.Close()
+	previewPlayer.PauseAndStopReading()
 	previewPlayer = nil
 }
 

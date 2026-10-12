@@ -180,7 +180,7 @@ func (b *soundBank) stopMusic() {
 	if b.music == nil {
 		return
 	}
-	_ = b.music.Close()
+	b.music.PauseAndStopReading()
 	b.music = nil
 }
 
