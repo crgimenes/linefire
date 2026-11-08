@@ -5,10 +5,10 @@ go 1.27.1
 require (
 	github.com/crgimenes/devengine v0.0.11
 	github.com/crgimenes/filo v0.1.1
-	github.com/crgimenes/gion v0.0.7
-	github.com/crgimenes/minigui v0.1.13
+	github.com/crgimenes/gion v0.0.8
+	github.com/crgimenes/minigui v0.1.14
 	github.com/crgimenes/native v0.1.18
-	github.com/hajimehoshi/ebiten/v2 v2.10.5
+	github.com/hajimehoshi/ebiten/v2 v2.10.6
 )
 
 require (
