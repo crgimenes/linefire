@@ -3,10 +3,10 @@ module github.com/crgimenes/linefire
 go 1.27.4
 
 require (
-	github.com/crgimenes/devengine v0.0.15
-	github.com/crgimenes/filo v0.1.4
-	github.com/crgimenes/gion v0.0.11
-	github.com/crgimenes/minigui v0.1.15
+	github.com/crgimenes/devengine v0.0.16
+	github.com/crgimenes/filo v0.1.5
+	github.com/crgimenes/gion v0.0.12
+	github.com/crgimenes/minigui v0.1.16
 	github.com/crgimenes/native v0.1.18
 	github.com/hajimehoshi/ebiten/v2 v2.10.6
 )
